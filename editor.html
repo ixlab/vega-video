@@ -1,0 +1,2133 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Vega-Video Playground</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Vega libs -->
+    <script src="https://cdn.jsdelivr.net/npm/vega@6"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-lite@6"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vega-embed@6"></script>
+
+    <!-- HLS for the player (in case specs use HLS) -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+
+    <!-- Your local library -->
+    <script src="./dist/vega-video.js"></script>
+
+    <!-- Ace editor -->
+    <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.3/src-min-noconflict/ace.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.3/src-min-noconflict/mode-json.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.3/src-min-noconflict/ext-searchbox.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.3/src-min-noconflict/theme-github.js"></script>
+
+    <style>
+        :root {
+            --gap: 16px;
+            --border: #e2e8f0;
+            --bg: #f1f5f9;
+            --card: #ffffff;
+            --accent: #6366f1;
+            --accent-hover: #4f46e5;
+            --text: #1e293b;
+            --text-muted: #64748b;
+            --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.06);
+            --shadow-lg: 0 10px 25px rgba(0,0,0,0.1), 0 6px 10px rgba(0,0,0,0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .app {
+            display: grid;
+            grid-template-columns: minmax(400px, 1fr) minmax(500px, 1.3fr);
+            gap: var(--gap);
+            padding: var(--gap);
+            height: 100vh;
+        }
+
+        .col {
+            display: flex;
+            flex-direction: column;
+            gap: var(--gap);
+            min-height: 0;
+            height: 100%;
+        }
+
+        .card {
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            background: var(--card);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            box-shadow: var(--shadow);
+        }
+
+        .card>header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--text);
+            background: #f8fafc;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .card>.body {
+            padding: 0;
+            min-height: 0;
+            overflow: auto;
+            flex: 1;
+        }
+
+        /* Editor panel - takes remaining space */
+        .card[aria-label="Spec Editor"] {
+            flex: 1;
+            min-height: 0;
+        }
+
+        #editor {
+            width: 100%;
+            height: 100%;
+            min-height: 200px;
+        }
+
+        /* Hide compiled panel */
+        .card[aria-label="Compiled Vega"] {
+            display: none;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 12px 16px;
+            border-top: 1px solid var(--border);
+            background: #f8fafc;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .controls button {
+            appearance: none;
+            border: 1px solid var(--border);
+            background: var(--card);
+            border-radius: 8px;
+            padding: 8px 14px;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .controls button:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+        }
+
+        .controls button.primary {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .controls button.primary:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+        }
+
+        .controls label {
+            display: inline-flex;
+            gap: 6px;
+            align-items: center;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .controls input[type="checkbox"] {
+            accent-color: var(--accent);
+        }
+
+        /* Right column - visualization and video */
+        .col:last-child .card:first-child {
+            flex: 1;
+            min-height: 0;
+        }
+
+        #vis {
+            min-height: 200px;
+            border-radius: 0 0 12px 12px;
+            overflow: auto;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 12px;
+            background: #fafafa;
+        }
+
+        .video-wrap {
+            position: relative;
+            background: #0f172a;
+            padding: 0;
+            border-radius: 0 0 12px 12px;
+            overflow: hidden;
+        }
+
+        video {
+            display: block;
+            width: 100%;
+            height: auto;
+            max-height: 35vh;
+            object-fit: contain;
+            outline: none;
+        }
+
+        /* Error bar */
+        #errors {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            white-space: pre-wrap;
+            font-size: 12px;
+            color: #dc2626;
+            padding: 12px 16px;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            display: none;
+            margin: 0;
+        }
+
+        .hint {
+            color: var(--text-muted);
+            font-weight: 400;
+            font-size: 12px;
+        }
+
+        @media (max-width: 980px) {
+            html, body {
+                overflow: auto;
+            }
+            .app {
+                grid-template-columns: 1fr;
+                height: auto;
+                min-height: 100vh;
+            }
+
+            video {
+                max-height: 40vh;
+            }
+
+            #editor {
+                height: 50vh;
+            }
+
+            .col:last-child .card:first-child {
+                flex: none;
+            }
+
+            #vis {
+                min-height: 300px;
+            }
+        }
+
+        /* ——— Examples modal ——— */
+        .examples-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+
+        .examples-modal.open {
+            display: flex;
+        }
+
+        .examples-panel {
+            width: min(600px, 90vw);
+            max-height: 75vh;
+            overflow: auto;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .examples-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 600;
+            font-size: 15px;
+            background: #f8fafc;
+            border-radius: 16px 16px 0 0;
+        }
+
+        .examples-list {
+            padding: 12px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+        }
+
+        .example-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: var(--card);
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .example-item:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            transform: translateY(-1px);
+        }
+
+        .example-meta {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .example-title {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .example-sub {
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+
+        .examples-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .examples-close {
+            appearance: none;
+            border: 1px solid var(--border);
+            background: var(--card);
+            border-radius: 8px;
+            padding: 8px 14px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.15s ease;
+        }
+
+        .examples-close:hover {
+            background: #f1f5f9;
+        }
+
+        #examplesBtn {
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            color: white;
+            font-weight: 500;
+            border: none;
+        }
+
+        #examplesBtn:hover {
+            background: linear-gradient(135deg, #ea580c, #c2410c);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app" role="application" aria-label="vega-video playground">
+        <!-- LEFT: editor -->
+        <section class="col">
+            <div class="card" aria-label="Spec Editor">
+                <header>
+                    <span>Spec (Vega or Vega-Lite)</span>
+                    <span class="hint">⌘/Ctrl+Enter to Run</span>
+                </header>
+                <div class="body">
+                    <div id="editor" aria-label="JSON editor"></div>
+                </div>
+                <div class="controls">
+                    <button id="run" class="primary" title="Run the current spec">Run</button>
+                    <label><input type="checkbox" id="autorun" checked /> Auto run</label>
+                    <span class="hint" id="status">—</span>
+
+                    <!-- push Examples button to the bottom-right -->
+                    <span style="flex:1"></span>
+                    <button id="examplesBtn" title="Open example specs">Examples</button>
+                </div>
+            </div>
+
+            <pre id="errors" aria-live="polite"></pre>
+
+            <div class="card" aria-label="Compiled Vega">
+                <header><span>Compiled Vega (read-only)</span><span class="hint" id="compile-hint">—</span></header>
+                <div class="body">
+                    <div id="compiled"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- RIGHT: vis + video -->
+        <section class="col">
+            <div class="card" aria-label="Vega">
+                <header>
+                    <span>Vega</span>
+                    <span class="hint" id="count-hint">—</span>
+                </header>
+                <div class="body" id="vis"></div>
+            </div>
+
+            <div class="card" aria-label="Video">
+                <header><span>Video (@main)</span></header>
+                <div class="body video-wrap">
+                    <video id="video-main" controls playsinline preload="metadata">Your browser needs video
+                        support.</video>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Examples gallery modal -->
+    <div id="examplesModal" class="examples-modal" aria-hidden="true">
+        <div class="examples-panel" role="dialog" aria-modal="true" aria-label="Example specs">
+            <div class="examples-header">
+                <span>Example specs</span>
+                <div class="examples-actions">
+                    <button id="examplesClose" class="examples-close">Close</button>
+                </div>
+            </div>
+            <div id="examplesList" class="examples-list"></div>
+        </div>
+    </div>
+
+    <script>
+        // --- Ace editors ---
+        const editor = ace.edit("editor", {
+            mode: "ace/mode/json",
+            theme: "ace/theme/github",
+            tabSize: 2,
+            useSoftTabs: true,
+            showPrintMargin: false,
+            wrap: true,
+        });
+        const compiled = ace.edit("compiled", {
+            mode: "ace/mode/json",
+            theme: "ace/theme/github",
+            readOnly: true,
+            highlightActiveLine: false,
+            showPrintMargin: false,
+            wrap: true,
+        });
+
+        // --- UI refs ---
+        const runBtn = document.getElementById('run');
+        const autoRun = document.getElementById('autorun');
+        const errorsEl = document.getElementById('errors');
+        const statusEl = document.getElementById('status');
+        const countHint = document.getElementById('count-hint');
+
+        // --- State ---
+        let currentView = null;
+        let currentAttach = null;
+
+        function setError(msg) {
+            if (!msg) { errorsEl.style.display = 'none'; errorsEl.textContent = ''; return; }
+            errorsEl.style.display = 'block';
+            errorsEl.textContent = String(msg);
+        }
+        function setStatus(msg) { statusEl.textContent = msg || '—'; }
+
+        function parseSpec(txt) {
+            try { return JSON.parse(txt); }
+            catch (e) { throw new Error("Invalid JSON: " + e.message); }
+        }
+
+        function isVegaLite(spec) {
+            const s = String(spec && spec.$schema || "").toLowerCase();
+            return s.includes("vega-lite");
+        }
+
+        function compileVega(spec) {
+            if (isVegaLite(spec)) {
+                try {
+                    let players = spec.players;
+                    const out = vegaLite.compile(spec, { config: spec.config }).spec;
+                    if (players) out.players = players;
+                    return out;
+                } catch (e) {
+                    throw new Error("Vega-Lite compile failed: " + e.message);
+                }
+            }
+            return spec; // already Vega
+        }
+
+        async function render(userSpec) {
+            try { if (currentAttach) currentAttach.detach(); } catch { }
+            try { if (currentView) await currentView.finalize(); } catch { }
+            currentAttach = null; currentView = null;
+            countHint.textContent = '—';
+
+            const compiledVega = compileVega(userSpec);
+
+            const videos = [{ name: "main", ref: '#video-main' }];
+
+            const rewritten = vegaVideo.rewrite(compiledVega, { videos });
+
+            const opt = { actions: false, renderer: 'svg' };
+            const result = await vegaEmbed('#vis', rewritten, opt);
+            const view = result.view;
+
+            const attach = vegaVideo.attach(view, {
+                videos,
+                spec: rewritten,
+            });
+
+            try {
+                view.addSignalListener('main_playlist_count', (_n, v) => {
+                    countHint.textContent = Number.isFinite(v) ? `${v} selected` : '—';
+                });
+            } catch { }
+            try {
+                view.addDataListener?.('main_status', () => {
+                    const d = view.data?.('main_status') || [];
+                    if (d[0] && Number.isFinite(d[0].count)) countHint.textContent = `${d[0].count} selected`;
+                });
+            } catch { }
+
+            currentView = view;
+            currentAttach = attach;
+
+            return { compiledVega, rewritten };
+        }
+
+        async function runFromEditor() {
+            setError('');
+            setStatus('Running…');
+            try {
+                const userSpec = parseSpec(editor.getValue());
+
+                const { compiledVega, rewritten } = await render(userSpec);
+
+                compiled.setValue(JSON.stringify(rewritten, null, 2), -1);
+                document.getElementById('compile-hint').textContent =
+                    isVegaLite(userSpec) ? 'compiled + vega-video rewrite' : 'vega-video rewrite';
+
+                setStatus('OK');
+            } catch (e) {
+                setError(e.message || String(e));
+                setStatus('Error');
+            }
+        }
+
+        // Debounced autorun
+        let timer = null;
+        function scheduleRun() {
+            if (!autoRun.checked) return;
+            clearTimeout(timer);
+            timer = setTimeout(runFromEditor, 350);
+        }
+
+        // Buttons & shortcuts
+        runBtn.addEventListener('click', runFromEditor);
+        editor.commands.addCommand({
+            name: 'runSpec',
+            bindKey: { win: 'Ctrl-Enter', mac: 'Command-Enter' },
+            exec: runFromEditor
+        });
+        editor.on('change', scheduleRun);
+
+        const DEFAULT_SPEC = {
+            "$schema": "https://vega.github.io/schema/vega/v6.json",
+            "description": "Line chart with video-synced playhead and click/drag to seek.",
+            "players": [
+                {
+                    "name": "main",
+                    "controls": true,
+                    "sources": [
+                        { "src": "https://f.dominik.win/vf-sample-media/bbb_720p.mp4", "type": "video/mp4" }
+                    ]
+                }
+            ],
+            "background": "white",
+            "padding": 5,
+            "width": 520,
+            "height": 220,
+            "style": "cell",
+
+            "signals": [
+                {
+                    "name": "@main:time",
+                    "on": [
+                        {
+                            "events": "@seekSurface:pointerdown, @seekSurface:pointermove[event.buttons]",
+                            "update": "invert('x', clamp(x(), 0, width))"
+                        }
+                    ]
+                }
+            ],
+
+            "data": [
+                {
+                    "name": "series",
+                    "transform": [
+                        {
+                            "type": "sequence",
+                            "start": 0,
+                            "stop": 596.0,
+                            "step": 0.1,
+                            "as": "time"
+                        },
+                        {
+                            "type": "formula",
+                            "as": "value",
+                            "expr": "(30*sin(2*PI*0.02*datum.time) + 12*sin(2*PI*0.11*datum.time + 1.2) + 5*sin(2*PI*0.5*datum.time) + 0.015*datum.time) + (28*exp(-pow((datum.time-85)/6,2)) + 22*exp(-pow((datum.time-210)/8,2)) + 35*exp(-pow((datum.time-398)/10,2)) + 18*exp(-pow((datum.time-560)/7,2)) + 26*exp(-pow((datum.time-690)/5,2))) + (random()-0.5)*1.2"
+                        }
+                    ]
+                }
+            ],
+
+            "scales": [
+                {
+                    "name": "x", "type": "linear", "domain": { "data": "series", "field": "time" },
+                    "range": [0, { "signal": "width" }], "nice": true, "zero": false
+                },
+                {
+                    "name": "y", "type": "linear", "domain": { "data": "series", "field": "value" },
+                    "range": [{ "signal": "height" }, 0], "nice": true, "zero": true
+                }
+            ],
+
+            "axes": [
+                {
+                    "scale": "x", "orient": "bottom", "gridScale": "y", "grid": true,
+                    "tickCount": { "signal": "ceil(width/40)" }, "domain": false, "labels": false,
+                    "aria": false, "maxExtent": 0, "minExtent": 0, "ticks": false, "zindex": 0
+                },
+                {
+                    "scale": "y", "orient": "left", "gridScale": "x", "grid": true,
+                    "tickCount": { "signal": "ceil(height/40)" }, "domain": false, "labels": false,
+                    "aria": false, "maxExtent": 0, "minExtent": 0, "ticks": false, "zindex": 0
+                },
+                {
+                    "scale": "x", "orient": "bottom", "grid": false, "title": "Time (s)",
+                    "labelFlush": true, "labelOverlap": true, "tickCount": { "signal": "ceil(width/40)" }, "zindex": 0
+                },
+                {
+                    "scale": "y", "orient": "left", "grid": false, "title": "Sample Data",
+                    "labelOverlap": true, "tickCount": { "signal": "ceil(height/40)" }, "zindex": 0
+                }
+            ],
+
+            "marks": [
+                {
+                    "type": "rect", "name": "seekSurface",
+                    "encode": {
+                        "enter": { "fill": { "value": "transparent" } },
+                        "update": {
+                            "x": { "value": 0 }, "x2": { "signal": "width" },
+                            "y": { "value": 0 }, "y2": { "signal": "height" }
+                        }
+                    }
+                },
+                {
+                    "type": "line", "clip": true, "style": ["line"], "interactive": true,
+                    "from": { "data": "series" },
+                    "encode": {
+                        "update": {
+                            "stroke": { "value": "#4c78a8" },
+                            "x": { "scale": "x", "field": "time" }, "y": { "scale": "y", "field": "value" }
+                        }
+                    }
+                },
+                {
+                    "type": "rule", "clip": true, "style": ["rule"], "interactive": false,
+                    "encode": {
+                        "update": {
+                            "strokeWidth": { "value": 1 },
+                            "stroke": { "value": "#222" },
+                            "x": { "scale": "x", "signal": "@main:itime" },
+                            "y": { "value": 0 }, "y2": { "signal": "height" }
+                        }
+                    }
+                },
+                {
+                    "type": "rule", "clip": true, "style": ["rule"], "interactive": false,
+                    "encode": {
+                        "update": {
+                            "strokeWidth": { "value": 2 },
+                            "strokeDash": { "value": [6, 4] },
+                            "stroke": { "value": "red" },
+                            "x": { "scale": "x", "signal": "@main:time" },
+                            "y": { "value": 0 }, "y2": { "signal": "height" }
+                        }
+                    }
+                }
+            ]
+        };
+
+        const TOS_KEYFRAMES = [
+            0.000000, 5.250000, 8.916667, 13.458333, 17.833333, 25.000000, 35.416667,
+            40.250000, 42.083333, 45.625000, 49.791667, 51.125000, 53.666667, 56.666667,
+            67.083333, 69.916667, 74.083333, 79.375000, 82.125000, 84.833333, 92.416667,
+            95.416667, 98.208333, 102.416667, 112.833333, 116.708333, 119.875000,
+            130.291667, 134.916667, 139.916667, 143.291667, 145.791667, 152.875000,
+            158.541667, 168.958333, 172.291667, 182.708333, 189.500000, 193.083333,
+            198.500000, 201.166667, 206.666667, 208.666667, 212.458333, 213.916667,
+            215.541667, 222.416667, 225.083333, 234.583333, 238.666667, 249.083333,
+            253.416667, 257.916667, 268.333333, 278.750000, 289.166667, 295.125000,
+            296.500000, 297.500000, 298.958333, 300.875000, 302.708333, 307.708333,
+            310.583333, 312.375000, 315.375000, 319.958333, 322.208333, 324.083333,
+            328.458333, 330.291667, 338.916667, 341.208333, 346.458333, 348.416667,
+            350.208333, 352.708333, 356.333333, 362.125000, 364.500000, 367.666667,
+            368.958333, 371.625000, 373.875000, 376.000000, 377.208333, 380.000000,
+            383.125000, 385.416667, 386.958333, 388.958333, 390.166667, 392.500000,
+            399.000000, 400.416667, 404.041667, 409.083333, 411.875000, 415.000000,
+            416.958333, 418.791667, 425.500000, 427.791667, 431.458333, 434.166667,
+            437.083333, 438.458333, 441.208333, 444.875000, 455.291667, 461.791667,
+            464.833333, 466.333333, 468.333333, 469.541667, 470.625000, 471.875000,
+            473.125000, 478.958333, 480.250000, 482.125000, 483.416667, 485.500000,
+            488.041667, 491.666667, 493.333333, 495.166667, 497.458333, 499.416667,
+            500.750000, 502.375000, 503.708333, 505.875000, 509.958333, 517.875000,
+            521.000000, 526.500000, 531.208333, 537.708333, 539.208333, 543.166667,
+            552.833333, 556.833333, 564.291667, 571.166667, 572.791667, 574.791667,
+            585.208333, 588.000000, 589.125000, 594.500000, 598.000000, 601.458333,
+            605.000000, 610.958333, 616.875000, 620.791667, 631.208333, 641.625000,
+            652.041667, 662.458333, 672.875000, 683.291667, 693.708333, 704.125000,
+            709.500000, 719.916667, 730.333333
+        ];
+        const RAPID_SCRUB_SPEC = (() => {
+            const s = JSON.parse(JSON.stringify(DEFAULT_SPEC));
+            s.description = "Syncing with keyframe-aware rapid scrub. Drag on the chart to scrub — continuous seeks snap to nearby keyframes for faster frame display, settling to exact position when idle.";
+            s.players[0].sources = [{ "src": "https://f.dominik.win/data/dve2/tos_720p.mp4", "type": "video/mp4" }];
+            s.players[0].keyframes = TOS_KEYFRAMES;
+            s.data[0].transform[0].stop = 731.0;
+            return s;
+        })();
+
+        const EXAMPLES = [
+            {
+                id: 'minimal-vega-sync-mp4',
+                title: 'Syncing a Plot Marker with a Video',
+                sub: 'Vega v6 · MP4 + line chart',
+                spec: DEFAULT_SPEC
+            },
+            {
+                id: 'rapid-scrub',
+                title: 'Rapid Scrub (Keyframe-Aware Seeking)',
+                sub: 'Vega v6 · continuous seeks snap to keyframes',
+                spec: RAPID_SCRUB_SPEC
+            },
+            {
+                id: 'bls-two-hist-scatter',
+                title: 'Brushing & Linking a Video Compilation',
+                sub: 'Vega-Lite v6 · build an HLS playlist from selections',
+                spec: {
+                    "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+                    "background": "#f8fafc",
+                    "padding": 16,
+                    "config": {
+                        "font": "Inter, system-ui, sans-serif",
+                        "axis": { "labelColor": "#64748b", "titleColor": "#334155", "gridColor": "#e2e8f0", "domainColor": "#cbd5e1", "tickColor": "#cbd5e1" },
+                        "title": { "color": "#1e293b", "fontSize": 13, "fontWeight": 600 },
+                        "view": { "stroke": "#e2e8f0" },
+                        "bar": { "cornerRadiusEnd": 3 }
+                    },
+                    "players": [
+                        {
+                            "name": "main",
+                            "controls": true,
+                            "playlist": {
+                                "source": "source_0",
+                                "filter": ["hist", "scat"],
+                                "segmentsField": "video_segments",
+                                "durationField": "duration",
+                                "uriField": "uri",
+                                "baseURL": "https://f.dominik.win/data/bls/"
+                            }
+                        }
+                    ],
+                    "data": {
+                        "url": "https://f.dominik.win/data/bls/bls_data100/events.json",
+                        "format": { "type": "json", "property": "events" }
+                    },
+                    "transform": [
+                        { "window": [{ "op": "row_number", "as": "row_index" }], "frame": [null, null] }
+                    ],
+                    "hconcat": [
+                        {
+                            "title": "Distribution A",
+                            "width": 160,
+                            "height": 140,
+                            "layer": [
+                                {
+                                    "params": [{ "name": "hist", "select": { "type": "interval", "encodings": ["x"] } }],
+                                    "mark": { "type": "bar", "color": "#e2e8f0" },
+                                    "encoding": {
+                                        "x": { "field": "norm1", "type": "quantitative", "bin": { "maxbins": 15 }, "title": null },
+                                        "y": { "aggregate": "count", "title": null }
+                                    }
+                                },
+                                {
+                                    "transform": [{ "filter": { "param": "hist" } }, { "filter": { "param": "scat" } }],
+                                    "mark": { "type": "bar", "color": "#6366f1" },
+                                    "encoding": {
+                                        "x": { "field": "norm1", "type": "quantitative", "bin": { "maxbins": 15 } },
+                                        "y": { "aggregate": "count" }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "title": "Distribution B",
+                            "width": 160,
+                            "height": 140,
+                            "layer": [
+                                {
+                                    "params": [{ "name": "hist", "select": { "type": "interval", "encodings": ["x"] } }],
+                                    "mark": { "type": "bar", "color": "#e2e8f0" },
+                                    "encoding": {
+                                        "x": { "field": "norm2", "type": "quantitative", "bin": { "maxbins": 15 }, "title": null },
+                                        "y": { "aggregate": "count", "title": null }
+                                    }
+                                },
+                                {
+                                    "transform": [{ "filter": { "param": "hist" } }, { "filter": { "param": "scat" } }],
+                                    "mark": { "type": "bar", "color": "#8b5cf6" },
+                                    "encoding": {
+                                        "x": { "field": "norm2", "type": "quantitative", "bin": { "maxbins": 15 } },
+                                        "y": { "aggregate": "count" }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "title": "Scatter View",
+                            "width": 180,
+                            "height": 140,
+                            "layer": [
+                                {
+                                    "params": [{ "name": "scat", "select": { "type": "interval" } }],
+                                    "mark": { "type": "circle", "size": 50, "color": "#e2e8f0" },
+                                    "encoding": {
+                                        "x": { "field": "scatter1_x", "type": "quantitative", "title": null },
+                                        "y": { "field": "scatter1_y", "type": "quantitative", "title": null }
+                                    }
+                                },
+                                {
+                                    "transform": [
+                                        { "filter": { "param": "hist" } },
+                                        { "filter": { "param": "scat" } },
+                                        { "window": [{ "op": "row_number", "as": "playlist_pos" }], "sort": [{ "field": "row_index", "order": "ascending" }] }
+                                    ],
+                                    "mark": { "type": "circle", "size": 60, "opacity": 0.85 },
+                                    "encoding": {
+                                        "x": { "field": "scatter1_x", "type": "quantitative" },
+                                        "y": { "field": "scatter1_y", "type": "quantitative" },
+                                        "color": { "field": "poisson1", "type": "ordinal", "scale": { "scheme": "plasma" }, "legend": null }
+                                    }
+                                },
+                                {
+                                    "transform": [
+                                        { "filter": { "param": "hist" } },
+                                        { "filter": { "param": "scat" } },
+                                        { "window": [{ "op": "row_number", "as": "playlist_pos" }], "sort": [{ "field": "row_index", "order": "ascending" }] },
+                                        { "filter": "datum.playlist_pos - 1 === main_playlist_current_index" }
+                                    ],
+                                    "mark": { "type": "circle", "size": 200, "stroke": "#ef4444", "strokeWidth": 3, "fill": "transparent" },
+                                    "encoding": {
+                                        "x": { "field": "scatter1_x", "type": "quantitative" },
+                                        "y": { "field": "scatter1_y", "type": "quantitative" }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'cursor-consistency',
+                title: 'Cursor Consistency',
+                sub: 'Vega-Lite v6 · playlist stays at same position during filtering',
+                spec: {
+                    "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+                    "description": "Brush the histogram to filter the video playlist. The video maintains its relative position instead of jumping back to the start.",
+                    "background": "#f8fafc",
+                    "padding": 16,
+                    "config": {
+                        "font": "Inter, system-ui, sans-serif",
+                        "axis": { "labelColor": "#64748b", "titleColor": "#334155", "gridColor": "#e2e8f0", "domainColor": "#cbd5e1", "tickColor": "#cbd5e1" },
+                        "title": { "color": "#1e293b", "fontSize": 13, "fontWeight": 600 },
+                        "view": { "stroke": "#e2e8f0" },
+                        "bar": { "cornerRadiusEnd": 3 }
+                    },
+                    "players": [
+                        {
+                            "name": "main",
+                            "controls": true,
+                            "playlist": {
+                                "source": "source_0",
+                                "filter": ["hist", "scat"],
+                                "segmentsField": "video_segments",
+                                "durationField": "duration",
+                                "uriField": "uri",
+                                "baseURL": "https://f.dominik.win/data/bls/"
+                            },
+                            "cursor": {
+                                "onKeep": "@new_seg.start + (@prev.time - @prev_seg.start)",
+                                "onRemove": "@new.duration * (@prev.time / @prev.duration)"
+                            }
+                        }
+                    ],
+                    "data": {
+                        "url": "https://f.dominik.win/data/bls/bls_data100/events.json",
+                        "format": { "type": "json", "property": "events" }
+                    },
+                    "transform": [
+                        { "window": [{ "op": "row_number", "as": "row_index" }], "frame": [null, null] }
+                    ],
+                    "hconcat": [
+                        {
+                            "title": "Distribution A",
+                            "width": 160,
+                            "height": 140,
+                            "layer": [
+                                {
+                                    "params": [{ "name": "hist", "select": { "type": "interval", "encodings": ["x"] } }],
+                                    "mark": { "type": "bar", "color": "#e2e8f0" },
+                                    "encoding": {
+                                        "x": { "field": "norm1", "type": "quantitative", "bin": { "maxbins": 15 }, "title": null },
+                                        "y": { "aggregate": "count", "title": null }
+                                    }
+                                },
+                                {
+                                    "transform": [{ "filter": { "param": "hist" } }, { "filter": { "param": "scat" } }],
+                                    "mark": { "type": "bar", "color": "#6366f1" },
+                                    "encoding": {
+                                        "x": { "field": "norm1", "type": "quantitative", "bin": { "maxbins": 15 } },
+                                        "y": { "aggregate": "count" }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "title": "Scatter View",
+                            "width": 180,
+                            "height": 140,
+                            "layer": [
+                                {
+                                    "params": [{ "name": "scat", "select": { "type": "interval" } }],
+                                    "mark": { "type": "circle", "size": 50, "color": "#e2e8f0" },
+                                    "encoding": {
+                                        "x": { "field": "scatter1_x", "type": "quantitative", "title": null },
+                                        "y": { "field": "scatter1_y", "type": "quantitative", "title": null }
+                                    }
+                                },
+                                {
+                                    "transform": [
+                                        { "filter": { "param": "hist" } },
+                                        { "filter": { "param": "scat" } },
+                                        { "window": [{ "op": "row_number", "as": "playlist_pos" }], "sort": [{ "field": "row_index", "order": "ascending" }] }
+                                    ],
+                                    "mark": { "type": "circle", "size": 60, "opacity": 0.85 },
+                                    "encoding": {
+                                        "x": { "field": "scatter1_x", "type": "quantitative" },
+                                        "y": { "field": "scatter1_y", "type": "quantitative" },
+                                        "color": { "field": "poisson1", "type": "ordinal", "scale": { "scheme": "plasma" }, "legend": null }
+                                    }
+                                },
+                                {
+                                    "transform": [
+                                        { "filter": { "param": "hist" } },
+                                        { "filter": { "param": "scat" } },
+                                        { "window": [{ "op": "row_number", "as": "playlist_pos" }], "sort": [{ "field": "row_index", "order": "ascending" }] },
+                                        { "filter": "datum.playlist_pos - 1 === main_playlist_current_index" }
+                                    ],
+                                    "mark": { "type": "circle", "size": 200, "stroke": "#ef4444", "strokeWidth": 3, "fill": "transparent" },
+                                    "encoding": {
+                                        "x": { "field": "scatter1_x", "type": "quantitative" },
+                                        "y": { "field": "scatter1_y", "type": "quantitative" }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'vega-playback-donut',
+                title: 'Playback Progress (donut)',
+                sub: 'Vega v6 · reads @main:itime / @main:duration',
+                spec: {
+                    "$schema": "https://vega.github.io/schema/vega/v6.json",
+                    "description": "Donut showing played vs unplayed video length; uses time_intent signal.",
+                    "players": [
+                        {
+                            "name": "main",
+                            "controls": true,
+                            "sources": [
+                                { "src": "https://f.dominik.win/vf-sample-media/bbb_720p.mp4", "type": "video/mp4" }
+                            ]
+                        }
+                    ],
+                    "width": 220,
+                    "height": 220,
+                    "autosize": "none",
+                    "data": [
+                        {
+                            "name": "parts",
+                            "values": [{ "k": "played" }, { "k": "unplayed" }],
+                            "transform": [
+                                {
+                                    "type": "formula",
+                                    "as": "v",
+                                    "expr": "datum.k === 'played' ? @main:itime : max(@main:duration - @main:itime, 0)"
+                                },
+                                { "type": "pie", "field": "v", "sort": false }
+                            ]
+                        }
+                    ],
+                    "scales": [
+                        {
+                            "name": "color",
+                            "type": "ordinal",
+                            "domain": ["played", "unplayed"],
+                            "range": ["#3b82f6", "#e5e7eb"]
+                        }
+                    ],
+                    "marks": [
+                        {
+                            "type": "arc",
+                            "from": { "data": "parts" },
+                            "encode": {
+                                "enter": {
+                                    "x": { "signal": "width/2" },
+                                    "y": { "signal": "height/2" },
+                                    "innerRadius": { "value": 70 },
+                                    "outerRadius": { "signal": "min(width, height)/2" },
+                                    "stroke": { "value": "#fff" },
+                                    "strokeWidth": { "value": 1 }
+                                },
+                                "update": {
+                                    "fill": { "scale": "color", "field": "k" },
+                                    "startAngle": { "field": "startAngle" },
+                                    "endAngle": { "field": "endAngle" }
+                                }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "update": {
+                                    "x": { "signal": "width/2" },
+                                    "y": { "signal": "height/2" },
+                                    "align": { "value": "center" },
+                                    "baseline": { "value": "middle" },
+                                    "fontSize": { "value": 20 },
+                                    "fontWeight": { "value": "600" },
+                                    "text": {
+                                        "signal": "format((@main:itime / max(@main:duration, 1)), '.1%') + ' played'"
+                                    },
+                                    "fill": { "value": "#111" }
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'vega-video-signals',
+                title: 'Vega-Video Signals',
+                sub: 'Vega v6 · display all video signals',
+                spec: {
+                    "$schema": "https://vega.github.io/schema/vega/v6.json",
+                    "description": "Simple vega-video signal playground for namespace `main`.",
+                    "background": "white",
+                    "padding": 5,
+                    "width": 520,
+                    "height": 210,
+                    "players": [
+                        {
+                            "name": "main",
+                            "controls": true,
+                            "sources": [
+                                { "src": "https://f.dominik.win/vf-sample-media/bbb_720p.mp4", "type": "video/mp4" }
+                            ]
+                        }
+                    ],
+                    "marks": [
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": {
+                                    "font": { "value": "monospace" },
+                                    "fontSize": { "value": 12 },
+                                    "align": { "value": "left" },
+                                    "baseline": { "value": "top" }
+                                },
+                                "update": {
+                                    "x": { "value": 4 },
+                                    "y": { "value": 4 },
+                                    "text": { "signal": "'@main:time: ' + format(@main:time, '.3f')" }
+                                }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": {
+                                    "font": { "value": "monospace" },
+                                    "fontSize": { "value": 12 },
+                                    "align": { "value": "left" },
+                                    "baseline": { "value": "top" }
+                                },
+                                "update": {
+                                    "x": { "value": 4 },
+                                    "y": { "value": 22 },
+                                    "text": { "signal": "'@main:itime: ' + format(@main:itime, '.3f')" }
+                                }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": {
+                                    "font": { "value": "monospace" },
+                                    "fontSize": { "value": 12 },
+                                    "align": { "value": "left" },
+                                    "baseline": { "value": "top" }
+                                },
+                                "update": {
+                                    "x": { "value": 4 },
+                                    "y": { "value": 40 },
+                                    "text": { "signal": "'@main:duration: ' + format(@main:duration, '.3f')" }
+                                }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": {
+                                    "font": { "value": "monospace" },
+                                    "fontSize": { "value": 12 },
+                                    "align": { "value": "left" },
+                                    "baseline": { "value": "top" }
+                                },
+                                "update": {
+                                    "x": { "value": 4 },
+                                    "y": { "value": 58 },
+                                    "text": { "signal": "'main_playing: ' + (main_playing ? 'true' : 'false')" }
+                                }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": {
+                                    "font": { "value": "monospace" },
+                                    "fontSize": { "value": 12 },
+                                    "align": { "value": "left" },
+                                    "baseline": { "value": "top" }
+                                },
+                                "update": {
+                                    "x": { "value": 4 },
+                                    "y": { "value": 76 },
+                                    "text": { "signal": "'main_ready: ' + (main_ready ? 'true' : 'false')" }
+                                }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": {
+                                    "font": { "value": "monospace" },
+                                    "fontSize": { "value": 12 },
+                                    "align": { "value": "left" },
+                                    "baseline": { "value": "top" }
+                                },
+                                "update": {
+                                    "x": { "value": 4 },
+                                    "y": { "value": 94 },
+                                    "text": { "signal": "'main_ended: ' + (main_ended ? 'true' : 'false')" }
+                                }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": {
+                                    "font": { "value": "monospace" },
+                                    "fontSize": { "value": 12 },
+                                    "align": { "value": "left" },
+                                    "baseline": { "value": "top" }
+                                },
+                                "update": {
+                                    "x": { "value": 4 },
+                                    "y": { "value": 112 },
+                                    "text": { "signal": "'main_playlist_count: ' + format(main_playlist_count, '.0f')" }
+                                }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": {
+                                    "font": { "value": "monospace" },
+                                    "fontSize": { "value": 12 },
+                                    "align": { "value": "left" },
+                                    "baseline": { "value": "top" }
+                                },
+                                "update": {
+                                    "x": { "value": 4 },
+                                    "y": { "value": 130 },
+                                    "text": { "signal": "'main_playlist_current_index: ' + main_playlist_current_index" }
+                                }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": {
+                                    "font": { "value": "monospace" },
+                                    "fontSize": { "value": 12 },
+                                    "align": { "value": "left" },
+                                    "baseline": { "value": "top" }
+                                },
+                                "update": {
+                                    "x": { "value": 4 },
+                                    "y": { "value": 148 },
+                                    "text": { "signal": "'main_playlist_time' + ': ' + format(main_playlist_time, '.3f')" }
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'yolo-annotations',
+                title: 'YOLO Object Detection Annotations',
+                sub: 'Vega v6 · annotation mark types: box, corner, circle, dot, ellipse, label',
+                spec: {
+                    "$schema": "https://vega.github.io/schema/vega/v6.json",
+                    "description": "Video with YOLO detection annotations. Toggle between annotation styles inspired by Supervision annotators.",
+                    "width": 1,
+                    "height": 1,
+                    "signals": [
+                        {
+                            "name": "minConfidence",
+                            "value": 0.3,
+                            "bind": { "input": "range", "min": 0, "max": 1, "step": 0.05 }
+                        },
+                        {
+                            "name": "annotationStyle",
+                            "value": "boundingbox",
+                            "bind": { "input": "select", "options": ["boundingbox", "corner", "circle", "dot", "ellipse"] }
+                        },
+                        {
+                            "name": "showLabels",
+                            "value": true,
+                            "bind": { "input": "checkbox" }
+                        }
+                    ],
+                    "data": [
+                        {
+                            "name": "detections",
+                            "url": "https://f.dominik.win/vf-sample-media/tos_720p-yolov8l-detections.json",
+                            "transform": [
+                                { "type": "filter", "expr": "datum.frame_index == main_frame_index" },
+                                { "type": "filter", "expr": "datum.confidence >= minConfidence" }
+                            ]
+                        }
+                    ],
+                    "players": [
+                        {
+                            "name": "main",
+                            "controls": true,
+                            "fps": 24,
+                            "sources": [
+                                { "src": "https://f.dominik.win/vf-sample-media/tos_720p.mp4", "type": "video/mp4" }
+                            ],
+                            "overlay": {
+                                "data": "detections",
+                                "dataWidth": 1280,
+                                "dataHeight": 720,
+                                "marks": [
+                                    { "type": "boundingbox", "showIf": { "signal": "annotationStyle", "value": "boundingbox" } },
+                                    { "type": "corner", "showIf": { "signal": "annotationStyle", "value": "corner" }, "encode": { "update": { "cornerLength": { "value": 15 }, "strokeWidth": { "value": 3 } } } },
+                                    { "type": "circle", "showIf": { "signal": "annotationStyle", "value": "circle" } },
+                                    { "type": "dot", "showIf": { "signal": "annotationStyle", "value": "dot" }, "encode": { "update": { "radius": { "value": 5 } } } },
+                                    { "type": "ellipse", "showIf": { "signal": "annotationStyle", "value": "ellipse" } },
+                                    { "type": "label", "showIf": { "signal": "showLabels" } }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'vega-video-playlist-signals',
+                title: 'Vega-Video Playlist',
+                sub: 'Vega v6 · multi-video playlist demo',
+                spec: {
+                    "$schema": "https://vega.github.io/schema/vega/v6.json",
+                    "description": "Simple signal and dataset viewer for the multi-video playlist demo.",
+                    "background": "white",
+                    "padding": 5,
+                    "width": 540,
+                    "height": 230,
+
+                    "players": [
+                        {
+                            "name": "main",
+                            "controls": true,
+                            "playlist": {
+                                "source": "source_0",
+                                "segmentsField": "video_segments",
+                                "durationField": "duration",
+                                "uriField": "uri",
+                                "baseURL": "https://f.dominik.win/data/bls/"
+                            }
+                        }
+                    ],
+
+                    "data": [
+                        {
+                            "name": "source_0",
+                            "url": "https://f.dominik.win/data/bls/bls_data100/events.json",
+                            "format": { "type": "json", "property": "events" }
+                        }
+                    ],
+                    "signals": [
+                    ],
+
+                    "marks": [
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": { "font": { "value": "monospace" }, "fontSize": { "value": 12 }, "align": { "value": "left" }, "baseline": { "value": "top" } },
+                                "update": { "x": { "value": 4 }, "y": { "value": 4 }, "text": { "signal": "'@main:time: ' + format(@main:time, '.3f')" } }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": { "font": { "value": "monospace" }, "fontSize": { "value": 12 }, "align": { "value": "left" }, "baseline": { "value": "top" } },
+                                "update": { "x": { "value": 4 }, "y": { "value": 22 }, "text": { "signal": "'@main:itime: ' + format(@main:itime, '.3f')" } }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": { "font": { "value": "monospace" }, "fontSize": { "value": 12 }, "align": { "value": "left" }, "baseline": { "value": "top" } },
+                                "update": { "x": { "value": 4 }, "y": { "value": 40 }, "text": { "signal": "'@main:duration: ' + format(@main:duration, '.3f')" } }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": { "font": { "value": "monospace" }, "fontSize": { "value": 12 }, "align": { "value": "left" }, "baseline": { "value": "top" } },
+                                "update": { "x": { "value": 4 }, "y": { "value": 58 }, "text": { "signal": "'main_playing: ' + (main_playing ? 'true' : 'false')" } }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": { "font": { "value": "monospace" }, "fontSize": { "value": 12 }, "align": { "value": "left" }, "baseline": { "value": "top" } },
+                                "update": { "x": { "value": 4 }, "y": { "value": 76 }, "text": { "signal": "'main_ready: ' + (main_ready ? 'true' : 'false')" } }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": { "font": { "value": "monospace" }, "fontSize": { "value": 12 }, "align": { "value": "left" }, "baseline": { "value": "top" } },
+                                "update": { "x": { "value": 4 }, "y": { "value": 94 }, "text": { "signal": "'main_ended: ' + (main_ended ? 'true' : 'false')" } }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": { "font": { "value": "monospace" }, "fontSize": { "value": 12 }, "align": { "value": "left" }, "baseline": { "value": "top" } },
+                                "update": { "x": { "value": 4 }, "y": { "value": 112 }, "text": { "signal": "'main_playlist_count: ' + main_playlist_count" } }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": { "font": { "value": "monospace" }, "fontSize": { "value": 12 }, "align": { "value": "left" }, "baseline": { "value": "top" } },
+                                "update": { "x": { "value": 4 }, "y": { "value": 130 }, "text": { "signal": "'main_playlist_current_index: ' + main_playlist_current_index" } }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": { "font": { "value": "monospace" }, "fontSize": { "value": 12 }, "align": { "value": "left" }, "baseline": { "value": "top" } },
+                                "update": { "x": { "value": 4 }, "y": { "value": 148 }, "text": { "signal": "'main_playlist_time' + ': ' + format(main_playlist_time, '.3f')" } }
+                            }
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'bdd100k-brushing-linking',
+                title: 'BDD100K: Driving Video Explorer',
+                sub: 'Vega-Lite v6 · filter driving clips by weather, objects, speed',
+                spec: {
+                    "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+                    "background": "#0f172a",
+                    "padding": 20,
+                    "config": {
+                        "font": "Inter, system-ui, sans-serif",
+                        "axis": { "labelColor": "#94a3b8", "titleColor": "#e2e8f0", "gridColor": "#1e293b", "domainColor": "#334155", "tickColor": "#334155" },
+                        "title": { "color": "#f1f5f9", "fontSize": 14, "fontWeight": 600, "offset": 12 },
+                        "legend": { "labelColor": "#94a3b8", "titleColor": "#e2e8f0" },
+                        "view": { "stroke": "#1e293b" },
+                        "bar": { "cornerRadiusEnd": 4 },
+                        "point": { "size": 100 }
+                    },
+                    "title": { "text": "Berkeley DeepDrive Explorer", "color": "#f8fafc", "fontSize": 18, "fontWeight": 700, "offset": 16 },
+                    "players": [
+                        {
+                            "name": "main",
+                            "controls": true,
+                            "playlist": {
+                                "source": "source_0",
+                                "filter": ["cat_sel", "scatter_sel"],
+                                "segmentsField": "video_segments",
+                                "durationField": "duration",
+                                "uriField": "uri",
+                                "baseURL": "https://f.dominik.win/vega-video-samples/"
+                            }
+                        }
+                    ],
+                    "data": {
+                        "url": "https://f.dominik.win/vega-video-samples/bdd_data100/events.json",
+                        "format": { "type": "json", "property": "events" }
+                    },
+                    "transform": [
+                        { "window": [{ "op": "row_number", "as": "row_index" }], "frame": [null, null] }
+                    ],
+                    "hconcat": [
+                        {
+                            "vconcat": [
+                                {
+                                    "title": "Weather",
+                                    "width": 150,
+                                    "height": 110,
+                                    "layer": [
+                                        {
+                                            "params": [{ "name": "cat_sel", "select": { "type": "point", "fields": ["weather"] } }],
+                                            "mark": { "type": "bar", "color": "#1e293b", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "weather", "type": "nominal", "title": null, "sort": "-x", "axis": { "labelColor": "#94a3b8" } },
+                                                "x": { "aggregate": "count", "title": null, "axis": { "grid": false } }
+                                            }
+                                        },
+                                        {
+                                            "transform": [{ "filter": { "param": "cat_sel" } }, { "filter": { "param": "scatter_sel" } }],
+                                            "mark": { "type": "bar", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "weather", "type": "nominal", "sort": "-x" },
+                                                "x": { "aggregate": "count" },
+                                                "color": { "field": "weather", "type": "nominal", "scale": { "domain": ["clear", "rainy", "snowy", "overcast", "partly cloudy"], "range": ["#fbbf24", "#3b82f6", "#e2e8f0", "#64748b", "#38bdf8"] }, "legend": null }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "title": "Scene",
+                                    "width": 150,
+                                    "height": 90,
+                                    "layer": [
+                                        {
+                                            "params": [{ "name": "cat_sel", "select": { "type": "point", "fields": ["scene"] } }],
+                                            "mark": { "type": "bar", "color": "#1e293b", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "scene", "type": "nominal", "title": null, "sort": "-x" },
+                                                "x": { "aggregate": "count", "title": null, "axis": { "grid": false } }
+                                            }
+                                        },
+                                        {
+                                            "transform": [{ "filter": { "param": "cat_sel" } }, { "filter": { "param": "scatter_sel" } }],
+                                            "mark": { "type": "bar", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "scene", "type": "nominal", "sort": "-x" },
+                                                "x": { "aggregate": "count" },
+                                                "color": { "field": "scene", "type": "nominal", "scale": { "domain": ["city street", "highway", "residential"], "range": ["#a78bfa", "#34d399", "#fb923c"] }, "legend": null }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "title": "Time of Day",
+                                    "width": 150,
+                                    "height": 80,
+                                    "layer": [
+                                        {
+                                            "params": [{ "name": "cat_sel", "select": { "type": "point", "fields": ["timeofday"] } }],
+                                            "mark": { "type": "bar", "color": "#1e293b", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "timeofday", "type": "nominal", "title": null, "sort": "-x" },
+                                                "x": { "aggregate": "count", "title": null, "axis": { "grid": false } }
+                                            }
+                                        },
+                                        {
+                                            "transform": [{ "filter": { "param": "cat_sel" } }, { "filter": { "param": "scatter_sel" } }],
+                                            "mark": { "type": "bar", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "timeofday", "type": "nominal", "sort": "-x" },
+                                                "x": { "aggregate": "count" },
+                                                "color": { "field": "timeofday", "type": "nominal", "scale": { "domain": ["daytime", "night", "dawn/dusk"], "range": ["#facc15", "#6366f1", "#f472b6"] }, "legend": null }
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "title": "Cars vs Pedestrians",
+                            "width": 300,
+                            "height": 300,
+                            "layer": [
+                                {
+                                    "params": [{ "name": "scatter_sel", "select": { "type": "interval" } }],
+                                    "mark": { "type": "circle", "size": 80, "color": "#1e293b" },
+                                    "encoding": {
+                                        "x": { "field": "car_count", "type": "quantitative", "title": "Cars Detected", "axis": { "gridColor": "#1e293b" } },
+                                        "y": { "field": "person_count", "type": "quantitative", "title": "Pedestrians", "axis": { "gridColor": "#1e293b" } }
+                                    }
+                                },
+                                {
+                                    "transform": [
+                                        { "filter": { "param": "cat_sel" } },
+                                        { "filter": { "param": "scatter_sel" } },
+                                        { "window": [{ "op": "row_number", "as": "playlist_pos" }], "sort": [{ "field": "row_index", "order": "ascending" }] }
+                                    ],
+                                    "mark": { "type": "circle", "size": 120, "opacity": 0.9 },
+                                    "encoding": {
+                                        "x": { "field": "car_count", "type": "quantitative" },
+                                        "y": { "field": "person_count", "type": "quantitative" },
+                                        "color": { "field": "weather", "type": "nominal", "scale": { "domain": ["clear", "rainy", "snowy", "overcast", "partly cloudy"], "range": ["#fbbf24", "#3b82f6", "#e2e8f0", "#64748b", "#38bdf8"] }, "legend": { "orient": "bottom", "columns": 3, "labelColor": "#94a3b8" } },
+                                        "tooltip": [
+                                            { "field": "weather", "type": "nominal" },
+                                            { "field": "scene", "type": "nominal" },
+                                            { "field": "timeofday", "type": "nominal", "title": "Time" },
+                                            { "field": "car_count", "type": "quantitative", "title": "Cars" },
+                                            { "field": "person_count", "type": "quantitative", "title": "People" },
+                                            { "field": "avg_speed_mps", "type": "quantitative", "title": "Speed (m/s)", "format": ".1f" }
+                                        ]
+                                    }
+                                },
+                                {
+                                    "transform": [
+                                        { "filter": { "param": "cat_sel" } },
+                                        { "filter": { "param": "scatter_sel" } },
+                                        { "window": [{ "op": "row_number", "as": "playlist_pos" }], "sort": [{ "field": "row_index", "order": "ascending" }] },
+                                        { "filter": "datum.playlist_pos - 1 === main_playlist_current_index" }
+                                    ],
+                                    "mark": { "type": "circle", "size": 450, "stroke": "#f43f5e", "strokeWidth": 3, "fill": "transparent" },
+                                    "encoding": {
+                                        "x": { "field": "car_count", "type": "quantitative" },
+                                        "y": { "field": "person_count", "type": "quantitative" }
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'bdd100k-speed-by-scene',
+                title: 'BDD100K: Speed by Scene Type',
+                sub: 'Vega-Lite v6 · compare driving speeds across road types',
+                spec: {
+                    "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+                    "background": "#faf5ff",
+                    "padding": 20,
+                    "config": {
+                        "font": "Inter, system-ui, sans-serif",
+                        "axis": { "labelColor": "#6b7280", "titleColor": "#374151", "gridColor": "#f3e8ff", "domainColor": "#d8b4fe", "tickColor": "#d8b4fe" },
+                        "title": { "color": "#1f2937", "fontSize": 14, "fontWeight": 600, "offset": 12 },
+                        "legend": { "labelColor": "#6b7280", "titleColor": "#374151" },
+                        "view": { "stroke": "#e9d5ff" },
+                        "bar": { "cornerRadiusEnd": 4 }
+                    },
+                    "title": { "text": "Speed Distribution by Scene", "color": "#581c87", "fontSize": 18, "fontWeight": 700, "offset": 16 },
+                    "players": [
+                        {
+                            "name": "main",
+                            "controls": true,
+                            "playlist": {
+                                "source": "source_0",
+                                "filter": ["scene_sel", "speed_sel"],
+                                "segmentsField": "video_segments",
+                                "durationField": "duration",
+                                "uriField": "uri",
+                                "baseURL": "https://f.dominik.win/vega-video-samples/"
+                            }
+                        }
+                    ],
+                    "data": {
+                        "url": "https://f.dominik.win/vega-video-samples/bdd_data100/events.json",
+                        "format": { "type": "json", "property": "events" }
+                    },
+                    "transform": [
+                        { "window": [{ "op": "row_number", "as": "row_index" }], "frame": [null, null] },
+                        { "filter": "datum.scene !== 'undefined'" }
+                    ],
+                    "hconcat": [
+                        {
+                            "title": "Speed by Road Type",
+                            "width": 300,
+                            "height": 280,
+                            "layer": [
+                                {
+                                    "params": [
+                                        { "name": "scene_sel", "select": { "type": "point", "fields": ["scene"] } },
+                                        { "name": "speed_sel", "select": { "type": "interval", "encodings": ["x"] } }
+                                    ],
+                                    "mark": { "type": "tick", "thickness": 2, "color": "#e9d5ff" },
+                                    "encoding": {
+                                        "y": { "field": "scene", "type": "nominal", "title": null, "sort": ["highway", "city street", "residential", "parking lot", "tunnel"] },
+                                        "x": { "field": "avg_speed_mps", "type": "quantitative", "title": "Average Speed (m/s)" }
+                                    }
+                                },
+                                {
+                                    "transform": [
+                                        { "filter": { "param": "scene_sel" } },
+                                        { "filter": { "param": "speed_sel" } },
+                                        { "window": [{ "op": "row_number", "as": "playlist_pos" }], "sort": [{ "field": "row_index", "order": "ascending" }] }
+                                    ],
+                                    "mark": { "type": "tick", "thickness": 4, "opacity": 0.9 },
+                                    "encoding": {
+                                        "y": { "field": "scene", "type": "nominal", "sort": ["highway", "city street", "residential", "parking lot", "tunnel"] },
+                                        "x": { "field": "avg_speed_mps", "type": "quantitative" },
+                                        "color": { "field": "scene", "type": "nominal", "scale": { "domain": ["highway", "city street", "residential", "parking lot", "tunnel"], "range": ["#22c55e", "#a855f7", "#f97316", "#ec4899", "#3b82f6"] }, "legend": null }
+                                    }
+                                },
+                                {
+                                    "transform": [
+                                        { "filter": { "param": "scene_sel" } },
+                                        { "filter": { "param": "speed_sel" } },
+                                        { "window": [{ "op": "row_number", "as": "playlist_pos" }], "sort": [{ "field": "row_index", "order": "ascending" }] },
+                                        { "filter": "datum.playlist_pos - 1 === main_playlist_current_index" }
+                                    ],
+                                    "mark": { "type": "tick", "thickness": 6, "color": "#dc2626" },
+                                    "encoding": {
+                                        "y": { "field": "scene", "type": "nominal", "sort": ["highway", "city street", "residential", "parking lot", "tunnel"] },
+                                        "x": { "field": "avg_speed_mps", "type": "quantitative" }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "vconcat": [
+                                {
+                                    "title": "Weather",
+                                    "width": 140,
+                                    "height": 85,
+                                    "layer": [
+                                        {
+                                            "params": [{ "name": "scene_sel", "select": { "type": "point", "fields": ["weather"] } }],
+                                            "mark": { "type": "bar", "color": "#f3e8ff", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "weather", "type": "nominal", "title": null, "sort": "-x" },
+                                                "x": { "aggregate": "count", "title": null, "axis": { "grid": false } }
+                                            }
+                                        },
+                                        {
+                                            "transform": [{ "filter": { "param": "scene_sel" } }, { "filter": { "param": "speed_sel" } }],
+                                            "mark": { "type": "bar", "color": "#8b5cf6", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "weather", "type": "nominal", "sort": "-x" },
+                                                "x": { "aggregate": "count" }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "title": "Time of Day",
+                                    "width": 140,
+                                    "height": 70,
+                                    "layer": [
+                                        {
+                                            "params": [{ "name": "scene_sel", "select": { "type": "point", "fields": ["timeofday"] } }],
+                                            "mark": { "type": "bar", "color": "#f3e8ff", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "timeofday", "type": "nominal", "title": null, "sort": "-x" },
+                                                "x": { "aggregate": "count", "title": null, "axis": { "grid": false } }
+                                            }
+                                        },
+                                        {
+                                            "transform": [{ "filter": { "param": "scene_sel" } }, { "filter": { "param": "speed_sel" } }],
+                                            "mark": { "type": "bar", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "timeofday", "type": "nominal", "sort": "-x" },
+                                                "x": { "aggregate": "count" },
+                                                "color": { "field": "timeofday", "type": "nominal", "scale": { "domain": ["daytime", "night", "dawn/dusk"], "range": ["#fbbf24", "#6366f1", "#f472b6"] }, "legend": null }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "title": "Scene Counts",
+                                    "width": 140,
+                                    "height": 95,
+                                    "layer": [
+                                        {
+                                            "params": [{ "name": "scene_sel", "select": { "type": "point", "fields": ["scene"] } }],
+                                            "mark": { "type": "bar", "color": "#f3e8ff", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "scene", "type": "nominal", "title": null, "sort": "-x" },
+                                                "x": { "aggregate": "count", "title": null, "axis": { "grid": false } }
+                                            }
+                                        },
+                                        {
+                                            "transform": [{ "filter": { "param": "scene_sel" } }, { "filter": { "param": "speed_sel" } }],
+                                            "mark": { "type": "bar", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "scene", "type": "nominal", "sort": "-x" },
+                                                "x": { "aggregate": "count" },
+                                                "color": { "field": "scene", "type": "nominal", "scale": { "domain": ["highway", "city street", "residential", "parking lot", "tunnel"], "range": ["#22c55e", "#a855f7", "#f97316", "#ec4899", "#3b82f6"] }, "legend": null }
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'bdd100k-weather-speed',
+                title: 'BDD100K: Weather Impact on Driving',
+                sub: 'Vega-Lite v6 · how weather affects driving speed',
+                spec: {
+                    "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
+                    "background": "#ecfdf5",
+                    "padding": 20,
+                    "config": {
+                        "font": "Inter, system-ui, sans-serif",
+                        "axis": { "labelColor": "#6b7280", "titleColor": "#374151", "gridColor": "#d1fae5", "domainColor": "#6ee7b7", "tickColor": "#6ee7b7" },
+                        "title": { "color": "#1f2937", "fontSize": 14, "fontWeight": 600, "offset": 12 },
+                        "legend": { "labelColor": "#6b7280", "titleColor": "#374151" },
+                        "view": { "stroke": "#a7f3d0" },
+                        "bar": { "cornerRadiusEnd": 4 }
+                    },
+                    "title": { "text": "Weather Impact on Speed", "color": "#065f46", "fontSize": 18, "fontWeight": 700, "offset": 16 },
+                    "players": [
+                        {
+                            "name": "main",
+                            "controls": true,
+                            "playlist": {
+                                "source": "source_0",
+                                "filter": ["weather_sel", "speed_brush"],
+                                "segmentsField": "video_segments",
+                                "durationField": "duration",
+                                "uriField": "uri",
+                                "baseURL": "https://f.dominik.win/vega-video-samples/"
+                            }
+                        }
+                    ],
+                    "data": {
+                        "url": "https://f.dominik.win/vega-video-samples/bdd_data100/events.json",
+                        "format": { "type": "json", "property": "events" }
+                    },
+                    "transform": [
+                        { "window": [{ "op": "row_number", "as": "row_index" }], "frame": [null, null] },
+                        { "filter": "datum.weather !== 'undefined'" }
+                    ],
+                    "vconcat": [
+                        {
+                            "title": "Speed Distribution by Weather",
+                            "width": 480,
+                            "height": 180,
+                            "layer": [
+                                {
+                                    "params": [
+                                        { "name": "weather_sel", "select": { "type": "point", "fields": ["weather"] } },
+                                        { "name": "speed_brush", "select": { "type": "interval", "encodings": ["x"] } }
+                                    ],
+                                    "mark": { "type": "tick", "thickness": 2, "color": "#d1fae5" },
+                                    "encoding": {
+                                        "x": { "field": "avg_speed_mps", "type": "quantitative", "title": "Average Speed (m/s)" },
+                                        "y": { "field": "weather", "type": "nominal", "title": null, "sort": ["clear", "partly cloudy", "overcast", "rainy", "snowy"] }
+                                    }
+                                },
+                                {
+                                    "transform": [
+                                        { "filter": { "param": "weather_sel" } },
+                                        { "filter": { "param": "speed_brush" } },
+                                        { "window": [{ "op": "row_number", "as": "playlist_pos" }], "sort": [{ "field": "row_index", "order": "ascending" }] }
+                                    ],
+                                    "mark": { "type": "tick", "thickness": 4, "opacity": 0.9 },
+                                    "encoding": {
+                                        "x": { "field": "avg_speed_mps", "type": "quantitative" },
+                                        "y": { "field": "weather", "type": "nominal", "sort": ["clear", "partly cloudy", "overcast", "rainy", "snowy"] },
+                                        "color": { "field": "weather", "type": "nominal", "scale": { "domain": ["clear", "partly cloudy", "overcast", "rainy", "snowy"], "range": ["#fbbf24", "#38bdf8", "#6b7280", "#3b82f6", "#cbd5e1"] }, "legend": null }
+                                    }
+                                },
+                                {
+                                    "transform": [
+                                        { "filter": { "param": "weather_sel" } },
+                                        { "filter": { "param": "speed_brush" } },
+                                        { "window": [{ "op": "row_number", "as": "playlist_pos" }], "sort": [{ "field": "row_index", "order": "ascending" }] },
+                                        { "filter": "datum.playlist_pos - 1 === main_playlist_current_index" }
+                                    ],
+                                    "mark": { "type": "tick", "thickness": 7, "color": "#059669" },
+                                    "encoding": {
+                                        "x": { "field": "avg_speed_mps", "type": "quantitative" },
+                                        "y": { "field": "weather", "type": "nominal", "sort": ["clear", "partly cloudy", "overcast", "rainy", "snowy"] }
+                                    }
+                                },
+                                {
+                                    "transform": [{ "aggregate": [{ "op": "mean", "field": "avg_speed_mps", "as": "mean_speed" }], "groupby": ["weather"] }],
+                                    "mark": { "type": "point", "shape": "diamond", "size": 120, "color": "#065f46", "filled": true },
+                                    "encoding": {
+                                        "x": { "field": "mean_speed", "type": "quantitative" },
+                                        "y": { "field": "weather", "type": "nominal", "sort": ["clear", "partly cloudy", "overcast", "rainy", "snowy"] },
+                                        "tooltip": [{ "field": "mean_speed", "type": "quantitative", "title": "Mean Speed", "format": ".1f" }]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "hconcat": [
+                                {
+                                    "title": "Weather",
+                                    "width": 150,
+                                    "height": 110,
+                                    "layer": [
+                                        {
+                                            "params": [{ "name": "weather_sel", "select": { "type": "point", "fields": ["weather"] } }],
+                                            "mark": { "type": "bar", "color": "#d1fae5", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "weather", "type": "nominal", "title": null, "sort": "-x" },
+                                                "x": { "aggregate": "count", "title": null, "axis": { "grid": false } }
+                                            }
+                                        },
+                                        {
+                                            "transform": [{ "filter": { "param": "weather_sel" } }, { "filter": { "param": "speed_brush" } }],
+                                            "mark": { "type": "bar", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "weather", "type": "nominal", "sort": "-x" },
+                                                "x": { "aggregate": "count" },
+                                                "color": { "field": "weather", "type": "nominal", "scale": { "domain": ["clear", "partly cloudy", "overcast", "rainy", "snowy"], "range": ["#fbbf24", "#38bdf8", "#6b7280", "#3b82f6", "#cbd5e1"] }, "legend": null }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "title": "Scene",
+                                    "width": 140,
+                                    "height": 110,
+                                    "layer": [
+                                        {
+                                            "params": [{ "name": "weather_sel", "select": { "type": "point", "fields": ["scene"] } }],
+                                            "mark": { "type": "bar", "color": "#d1fae5", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "scene", "type": "nominal", "title": null, "sort": "-x" },
+                                                "x": { "aggregate": "count", "title": null, "axis": { "grid": false } }
+                                            }
+                                        },
+                                        {
+                                            "transform": [{ "filter": { "param": "weather_sel" } }, { "filter": { "param": "speed_brush" } }],
+                                            "mark": { "type": "bar", "color": "#10b981", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "y": { "field": "scene", "type": "nominal", "sort": "-x" },
+                                                "x": { "aggregate": "count" }
+                                            }
+                                        }
+                                    ]
+                                },
+                                {
+                                    "title": "Max Speed",
+                                    "width": 150,
+                                    "height": 110,
+                                    "layer": [
+                                        {
+                                            "params": [{ "name": "speed_brush", "select": { "type": "interval", "encodings": ["x"] } }],
+                                            "mark": { "type": "bar", "color": "#d1fae5", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "x": { "field": "max_speed_mps", "type": "quantitative", "bin": { "maxbins": 10 }, "title": null, "axis": { "grid": false } },
+                                                "y": { "aggregate": "count", "title": null }
+                                            }
+                                        },
+                                        {
+                                            "transform": [{ "filter": { "param": "weather_sel" } }, { "filter": { "param": "speed_brush" } }],
+                                            "mark": { "type": "bar", "color": "#059669", "cornerRadiusEnd": 4 },
+                                            "encoding": {
+                                                "x": { "field": "max_speed_mps", "type": "quantitative", "bin": { "maxbins": 10 } },
+                                                "y": { "aggregate": "count" }
+                                            }
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            {
+                id: 'the-elements-periodic-table',
+                title: 'The Elements Song - Periodic Table',
+                sub: 'Vega v6 · Tom Lehrer · synced element highlighting',
+                spec: {
+                    "$schema": "https://vega.github.io/schema/vega/v6.json",
+                    "description": "Periodic table synchronized with Tom Lehrer's 'The Elements' song. Elements turn red when sung, then green.",
+                    "width": 720,
+                    "height": 400,
+                    "padding": 10,
+                    "background": "#1a1a2e",
+                    "players": [
+                        {
+                            "name": "main",
+                            "controls": true,
+                            "sources": [
+                                { "src": "https://f.dominik.win/vega-video-samples/elements/the-elements.mp4", "type": "video/mp4" }
+                            ]
+                        }
+                    ],
+                    "data": [
+                        {
+                            "name": "elements",
+                            "url": "https://f.dominik.win/vega-video-samples/elements/the-elements.json",
+                            "format": { "type": "json", "property": "elements" }
+                        },
+                        {
+                            "name": "timings",
+                            "url": "https://f.dominik.win/vega-video-samples/elements/the-elements.json",
+                            "format": { "type": "json", "property": "timings" }
+                        },
+                        {
+                            "name": "table",
+                            "source": "elements",
+                            "transform": [
+                                {
+                                    "type": "lookup",
+                                    "from": "timings",
+                                    "key": "symbol",
+                                    "fields": ["symbol"],
+                                    "values": ["start", "end"],
+                                    "as": ["start", "end"]
+                                },
+                                {
+                                    "type": "formula",
+                                    "as": "state",
+                                    "expr": "datum.start == null ? 'notInSong' : @main:itime < datum.start ? 'pending' : @main:itime <= datum.end ? 'active' : 'done'"
+                                }
+                            ]
+                        }
+                    ],
+                    "signals": [
+                        {
+                            "name": "@main:time",
+                            "on": [
+                                {
+                                    "events": "@elementRect:click",
+                                    "update": "datum.start != null ? datum.start : @main:time"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "@main:playing",
+                            "on": [
+                                {
+                                    "events": "@elementRect:click",
+                                    "update": "datum.start != null ? true : @main:playing"
+                                }
+                            ]
+                        }
+                    ],
+                    "scales": [
+                        {
+                            "name": "x",
+                            "type": "band",
+                            "domain": { "signal": "sequence(1, 19)" },
+                            "range": [0, { "signal": "width" }],
+                            "padding": 0.1
+                        },
+                        {
+                            "name": "y",
+                            "type": "band",
+                            "domain": [1, 2, 3, 4, 5, 6, 7, 9, 10],
+                            "range": [0, { "signal": "height" }],
+                            "padding": 0.1
+                        },
+                        {
+                            "name": "color",
+                            "type": "ordinal",
+                            "domain": ["notInSong", "pending", "active", "done"],
+                            "range": ["#2d2d44", "#4a4a6a", "#e63946", "#2a9d8f"]
+                        }
+                    ],
+                    "marks": [
+                        {
+                            "type": "rect",
+                            "name": "elementRect",
+                            "from": { "data": "table" },
+                            "encode": {
+                                "enter": {
+                                    "cornerRadius": { "value": 4 },
+                                    "cursor": { "value": "pointer" }
+                                },
+                                "update": {
+                                    "x": { "scale": "x", "field": "x" },
+                                    "width": { "scale": "x", "band": 1 },
+                                    "y": { "scale": "y", "field": "y" },
+                                    "height": { "scale": "y", "band": 1 },
+                                    "fill": { "scale": "color", "field": "state" },
+                                    "stroke": { "value": "#0f0f1a" },
+                                    "strokeWidth": { "value": 1 }
+                                }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "from": { "data": "table" },
+                            "interactive": false,
+                            "encode": {
+                                "enter": {
+                                    "fontSize": { "value": 16 },
+                                    "fontWeight": { "value": "bold" },
+                                    "align": { "value": "center" },
+                                    "baseline": { "value": "middle" }
+                                },
+                                "update": {
+                                    "x": { "scale": "x", "field": "x", "band": 0.5 },
+                                    "y": { "scale": "y", "field": "y", "band": 0.45 },
+                                    "text": { "field": "symbol" },
+                                    "fill": { "signal": "datum.state === 'active' ? '#fff' : datum.state === 'done' ? '#fff' : '#9ca3af'" }
+                                }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "from": { "data": "table" },
+                            "interactive": false,
+                            "encode": {
+                                "enter": {
+                                    "fontSize": { "value": 8 },
+                                    "align": { "value": "center" },
+                                    "baseline": { "value": "top" }
+                                },
+                                "update": {
+                                    "x": { "scale": "x", "field": "x", "band": 0.5 },
+                                    "y": { "scale": "y", "field": "y", "band": 0.68 },
+                                    "text": { "field": "number" },
+                                    "fill": { "signal": "datum.state === 'active' ? '#fca5a5' : datum.state === 'done' ? '#99e2d8' : '#6b7280'" }
+                                }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": {
+                                    "fontSize": { "value": 11 },
+                                    "fill": { "value": "#6b7280" },
+                                    "align": { "value": "left" },
+                                    "baseline": { "value": "middle" }
+                                },
+                                "update": {
+                                    "x": { "scale": "x", "value": 3, "band": 0 },
+                                    "y": { "scale": "y", "value": 6, "band": 0.5 },
+                                    "text": { "value": "57-71" }
+                                }
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "encode": {
+                                "enter": {
+                                    "fontSize": { "value": 11 },
+                                    "fill": { "value": "#6b7280" },
+                                    "align": { "value": "left" },
+                                    "baseline": { "value": "middle" }
+                                },
+                                "update": {
+                                    "x": { "scale": "x", "value": 3, "band": 0 },
+                                    "y": { "scale": "y", "value": 7, "band": 0.5 },
+                                    "text": { "value": "89-103" }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        ];
+
+        const examplesBtn = document.getElementById('examplesBtn');
+        const examplesModal = document.getElementById('examplesModal');
+        const examplesClose = document.getElementById('examplesClose');
+        const examplesList = document.getElementById('examplesList');
+
+        function openExamples() {
+            examplesList.innerHTML = '';
+            EXAMPLES.forEach((ex) => {
+                const el = document.createElement('div');
+                el.className = 'example-item';
+                el.innerHTML = `
+        <div class="example-meta">
+          <div class="example-title">${ex.title}</div>
+          <div class="example-sub">${ex.sub || ''}</div>
+        </div>
+        <div class="hint">Click to load</div>
+      `;
+                el.addEventListener('click', async () => {
+                    closeExamples();
+                    editor.setValue(JSON.stringify(ex.spec, null, 2), -1);
+                    await runFromEditor();
+                });
+                examplesList.appendChild(el);
+            });
+
+            examplesModal.classList.add('open');
+            examplesModal.setAttribute('aria-hidden', 'false');
+        }
+
+        function closeExamples() {
+            examplesModal.classList.remove('open');
+            examplesModal.setAttribute('aria-hidden', 'true');
+        }
+
+        examplesBtn.addEventListener('click', openExamples);
+        examplesClose.addEventListener('click', closeExamples);
+        examplesModal.addEventListener('click', (e) => {
+            if (e.target === examplesModal) closeExamples();
+        });
+
+        (async function init() {
+            editor.setValue(JSON.stringify(DEFAULT_SPEC, null, 2), -1);
+            await runFromEditor();
+        })();
+    </script>
+
+</body>
+
+</html>

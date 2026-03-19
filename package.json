@@ -1,0 +1,41 @@
+{
+  "name": "vega-video",
+  "version": "0.1.0",
+  "description": "First-class video support for Vega and Vega-Lite: syncing, annotations, and video transformations.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ixlab/vega-video.git"
+  },
+  "homepage": "https://github.com/ixlab/vega-video",
+  "author": "Dominik Winecki <dominikwinecki@gmail.com>",
+  "keywords": [
+    "vega",
+    "vega-lite",
+    "video",
+    "visualization"
+  ],
+  "files": [
+    "dist",
+    "src"
+  ],
+  "type": "module",
+  "module": "dist/vega-video.esm.js",
+  "exports": {
+    ".": {
+      "import": "./dist/vega-video.esm.js",
+      "require": "./dist/vega-video.js"
+    }
+  },
+  "scripts": {
+    "build:esm": "bun build ./src/index.js --outdir ./dist --format esm --target browser --entry-naming=vega-video.esm.js",
+    "build:iife": "bun build ./src/global.js --outdir ./dist --format iife --target browser --entry-naming=vega-video.js",
+    "build": "bun run build:esm && bun run build:iife",
+    "test": "bun test --preload ./test/setup-env.js"
+  },
+  "devDependencies": {
+    "jsdom": "^27.2.0",
+    "vega": "^6.2.0"
+  },
+  "packageManager": "bun@1.3.3"
+}
