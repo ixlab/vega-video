@@ -5,6 +5,10 @@ It lets you create portable, expressive, and performant visualizations combining
 
 Vega-Video lets you sync with a video player through signals (e.g., `@player:time`), annotate videos with CV detections (e.g., draw bounding boxes), and compose and transform videos (e.g., filter or sort a compilation).
 
+## Editor
+
+Try the interactive editor at **[ixlab.github.io/vega-video/editor/](https://ixlab.github.io/vega-video/editor/)**.
+
 ## Build
 
 ```bash
