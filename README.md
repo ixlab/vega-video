@@ -1,4 +1,4 @@
-# vega-video.js / Brushing, Linking, and Syncing with Video Data
+# vega-video
 
 Vega-Video is a [Vega](https://vega.github.io/vega/) plugin for video data.
 It lets you create portable, expressive, and performant visualizations combining conventional and video data.
