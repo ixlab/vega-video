@@ -42,7 +42,6 @@ export class AnnotationRenderer {
     this._scaleY = 1;
     this._devicePixelRatio = 1;
 
-    this._unsub = null;
     this._unsubs = [];
     this._resizeObserver = null;
 
@@ -50,7 +49,6 @@ export class AnnotationRenderer {
     this._bindVideoEvents();
     this._bindResize();
     this._bindDataListener();
-    this._bindMarkSignals();
   }
 
   _createCanvas() {
@@ -149,42 +147,34 @@ export class AnnotationRenderer {
   }
 
   _bindDataListener() {
-    if (!this.view || !this.dataSource) return;
+    if (!this.view) return;
 
     const handler = () => this._render();
 
-    try {
-      this.view.addDataListener(this.dataSource, handler);
-      this._unsub = () => {
-        try { this.view.removeDataListener(this.dataSource, handler); } catch { }
-      };
-    } catch (e) {
-      console.warn("vega-video: failed to bind data listener", e);
+    const sources = new Set();
+    if (this.dataSource) sources.add(this.dataSource);
+    for (const mark of this.marks) {
+      if (mark.from?.data) sources.add(mark.from.data);
+    }
+
+    for (const src of sources) {
+      try {
+        this.view.addDataListener(src, handler);
+        this._unsubs.push(() => {
+          try { this.view.removeDataListener(src, handler); } catch { }
+        });
+      } catch (e) {
+        console.warn("vega-video: failed to bind data listener for", src, e);
+      }
     }
 
     this._render();
   }
 
-  _bindMarkSignals() {
-    const seen = new Set();
-    for (const mark of this.marks) {
-      const sig = mark.showIf?.signal;
-      if (!sig || seen.has(sig)) continue;
-      seen.add(sig);
-      const handler = () => this._render();
-      try {
-        this.view.addSignalListener(sig, handler);
-        this._unsubs.push(() => {
-          try { this.view.removeSignalListener(sig, handler); } catch { }
-        });
-      } catch { }
-    }
-  }
-
-  _getDetections() {
-    if (!this.view || !this.dataSource) return [];
+  _getData(source) {
+    if (!this.view || !source) return [];
     try {
-      return this.view.data(this.dataSource) || [];
+      return this.view.data(source) || [];
     } catch {
       return [];
     }
@@ -193,8 +183,6 @@ export class AnnotationRenderer {
   _render() {
     if (!this.ctx || !this.canvas) return;
 
-    const detections = this._getDetections();
-
     // Apply DPR transform so all drawing is in CSS-pixel units
     this.ctx.setTransform(this._devicePixelRatio, 0, 0, this._devicePixelRatio, 0, 0);
     const cssW = this.canvas.width / this._devicePixelRatio;
@@ -202,16 +190,7 @@ export class AnnotationRenderer {
     this.ctx.clearRect(0, 0, cssW, cssH);
 
     for (const mark of this.marks) {
-      if (mark.showIf) {
-        try {
-          const val = this.view.signal(mark.showIf.signal);
-          if ("value" in mark.showIf) {
-            if (val !== mark.showIf.value) continue;
-          } else {
-            if (!val) continue;
-          }
-        } catch { continue; }
-      }
+      const detections = this._getData(mark.from?.data || this.dataSource);
       const type = mark.type;
       if (type === "boundingbox") {
         this._renderBoundingBoxes(detections, mark);
@@ -230,11 +209,24 @@ export class AnnotationRenderer {
   }
 
   /** Extract bbox from a detection datum, returns null if invalid */
-  _bbox(d) {
-    const x_min = d.x_min ?? d.xmin;
-    const y_min = d.y_min ?? d.ymin;
-    const x_max = d.x_max ?? d.xmax;
-    const y_max = d.y_max ?? d.ymax;
+  _bbox(d, encode) {
+    let x_min, y_min, x_max, y_max;
+
+    if (encode?.xyxy?.field) {
+      const xyxy = d[encode.xyxy.field];
+      if (Array.isArray(xyxy) && xyxy.length === 4) {
+        [x_min, y_min, x_max, y_max] = xyxy;
+        if (Number.isFinite(x_min) && Number.isFinite(y_min) &&
+          Number.isFinite(x_max) && Number.isFinite(y_max)) {
+          return { x_min, y_min, x_max, y_max };
+        }
+      }
+    }
+
+    x_min = d.x_min ?? d.xmin;
+    y_min = d.y_min ?? d.ymin;
+    x_max = d.x_max ?? d.xmax;
+    y_max = d.y_max ?? d.ymax;
 
     if (!Number.isFinite(x_min) || !Number.isFinite(y_min) ||
       !Number.isFinite(x_max) || !Number.isFinite(y_max)) return null;
@@ -243,10 +235,13 @@ export class AnnotationRenderer {
   }
 
   _forEachDetection(detections, mark, drawFn) {
+    const encode = mark.encode?.update || mark.encode || {};
     for (const d of detections) {
-      const b = this._bbox(d);
+      const b = this._bbox(d, encode);
       if (!b) continue;
-      const classId = d.class_id ?? 0;
+      const classId = encode.class_id?.field
+        ? (d[encode.class_id.field] ?? 0)
+        : (d.class_id ?? 0);
       drawFn(d, b, classId);
     }
   }
@@ -261,7 +256,8 @@ export class AnnotationRenderer {
       const h = (b.y_max - b.y_min) * this._scaleY;
 
       this.ctx.lineWidth = lineWidth;
-      this.ctx.strokeStyle = encode.stroke?.value || getColor(classId, this._colorMap, this._colors);
+      this.ctx.strokeStyle = (encode.stroke?.field ? d[encode.stroke.field] : encode.stroke?.value)
+        || getColor(classId, this._colorMap, this._colors);
       this.ctx.strokeRect(x, y, w, h);
     });
   }
@@ -275,13 +271,19 @@ export class AnnotationRenderer {
       const x = this._tx(b.x_min);
       const y = this._ty(b.y_min);
 
-      const bgColor = encode.fill?.value || getColor(classId, this._colorMap, this._colors);
+      const bgColor = (encode.fill?.field ? d[encode.fill.field] : encode.fill?.value)
+        || getColor(classId, this._colorMap, this._colors);
 
-      const className = d.class_name ?? `Class ${classId}`;
-      const confidence = d.confidence;
-      const labelText = confidence !== undefined
-        ? `${className} ${(confidence * 100).toFixed(0)}%`
-        : className;
+      let labelText;
+      if (encode.label?.field) {
+        labelText = String(d[encode.label.field] ?? "");
+      } else {
+        const className = d.class_name ?? `Class ${classId}`;
+        const confidence = d.confidence;
+        labelText = confidence !== undefined
+          ? `${className} ${(confidence * 100).toFixed(0)}%`
+          : className;
+      }
 
       this.ctx.font = `${fontSize}px ${fontFamily}`;
       this.ctx.textBaseline = "top";
@@ -311,7 +313,8 @@ export class AnnotationRenderer {
       const cl = Math.min(cornerLength, (x2 - x) / 2, (y2 - y) / 2);
 
       this.ctx.lineWidth = lineWidth;
-      this.ctx.strokeStyle = encode.stroke?.value || getColor(classId, this._colorMap, this._colors);
+      this.ctx.strokeStyle = (encode.stroke?.field ? d[encode.stroke.field] : encode.stroke?.value)
+        || getColor(classId, this._colorMap, this._colors);
       this.ctx.beginPath();
       this.ctx.moveTo(x, y + cl); this.ctx.lineTo(x, y); this.ctx.lineTo(x + cl, y);
       this.ctx.moveTo(x2 - cl, y); this.ctx.lineTo(x2, y); this.ctx.lineTo(x2, y + cl);
@@ -328,7 +331,8 @@ export class AnnotationRenderer {
       const cx = this._tx((b.x_min + b.x_max) / 2);
       const cy = this._ty((b.y_min + b.y_max) / 2);
 
-      this.ctx.fillStyle = encode.fill?.value || getColor(classId, this._colorMap, this._colors);
+      this.ctx.fillStyle = (encode.fill?.field ? d[encode.fill.field] : encode.fill?.value)
+        || getColor(classId, this._colorMap, this._colors);
       this.ctx.beginPath();
       this.ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
       this.ctx.fill();
@@ -341,13 +345,13 @@ export class AnnotationRenderer {
     this._forEachDetection(detections, mark, (d, b, classId) => {
       const cx = this._tx((b.x_min + b.x_max) / 2);
       const cy = this._ty((b.y_min + b.y_max) / 2);
-      // Use uniform scale so circles stay circular
       const dataR = Math.max(b.x_max - b.x_min, b.y_max - b.y_min) / 2;
       const scale = Math.min(this._scaleX, this._scaleY);
       const r = dataR * scale;
 
       this.ctx.lineWidth = lineWidth;
-      this.ctx.strokeStyle = encode.stroke?.value || getColor(classId, this._colorMap, this._colors);
+      this.ctx.strokeStyle = (encode.stroke?.field ? d[encode.stroke.field] : encode.stroke?.value)
+        || getColor(classId, this._colorMap, this._colors);
       this.ctx.beginPath();
       this.ctx.arc(cx, cy, r, 0, 2 * Math.PI);
       this.ctx.stroke();
@@ -364,7 +368,8 @@ export class AnnotationRenderer {
       const ry = ((b.y_max - b.y_min) / 2) * this._scaleY * ELLIPSE_VERTICAL_SCALE;
 
       this.ctx.lineWidth = lineWidth;
-      this.ctx.strokeStyle = encode.stroke?.value || getColor(classId, this._colorMap, this._colors);
+      this.ctx.strokeStyle = (encode.stroke?.field ? d[encode.stroke.field] : encode.stroke?.value)
+        || getColor(classId, this._colorMap, this._colors);
       this.ctx.beginPath();
       this.ctx.ellipse(cx, baseY, rx, ry, 0, 0, 2 * Math.PI);
       this.ctx.stroke();
@@ -372,10 +377,6 @@ export class AnnotationRenderer {
   }
 
   destroy() {
-    if (this._unsub) {
-      this._unsub();
-      this._unsub = null;
-    }
     for (const fn of this._unsubs) fn();
     this._unsubs = [];
     if (this._resizeObserver) {

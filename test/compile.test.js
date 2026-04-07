@@ -251,12 +251,12 @@ describe("rewriteSpec", () => {
     expect(playlistData.transform).toBeUndefined();
   });
 
-  it("throws error when overlay is specified without fps", () => {
+  it("throws error when annotation is specified without fps", () => {
     const spec = {
       players: [
         {
           name: "main",
-          overlay: {
+          annotation: {
             data: "detections",
             marks: [{ type: "boundingbox" }]
           }
@@ -265,7 +265,7 @@ describe("rewriteSpec", () => {
     };
 
     expect(() => rewriteSpec(spec)).toThrow(
-      'vega-video: Player "main" has an overlay but no fps specified.'
+      'vega-video: Player "main" has an annotation but no fps specified.'
     );
   });
 
@@ -447,13 +447,13 @@ describe("rewriteSpec", () => {
     expect(playerSignals).toContain("seek_to_continuous");
   });
 
-  it("allows overlay when fps is specified", () => {
+  it("allows annotation when fps is specified", () => {
     const spec = {
       players: [
         {
           name: "main",
           fps: 24,
-          overlay: {
+          annotation: {
             data: "detections",
             marks: [{ type: "boundingbox" }]
           }
@@ -464,6 +464,6 @@ describe("rewriteSpec", () => {
     // Should not throw
     const rewritten = rewriteSpec(spec);
     expect(rewritten.usermeta.players[0].fps).toBe(24);
-    expect(rewritten.usermeta.players[0].overlay).toBeDefined();
+    expect(rewritten.usermeta.players[0].annotation).toBeDefined();
   });
 });

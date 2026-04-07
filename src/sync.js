@@ -62,7 +62,7 @@ export class Player {
     this._applyAttributes();
     this._wireVideoEvents();
     this._wireControlSignals();
-    this._initOverlay();
+    this._initAnnotation();
 
     const ready = !isNaN(this.video.duration);
     const t = this.video.currentTime || 0;
@@ -347,22 +347,22 @@ export class Player {
     this._videoFrameCallbackId = null;
   }
 
-  _initOverlay() {
-    const overlay = this.cfg.overlay;
-    if (!overlay || !overlay.data || !overlay.marks?.length) return;
+  _initAnnotation() {
+    const annotation = this.cfg.annotation;
+    if (!annotation || !annotation.data || !annotation.marks?.length) return;
 
     const opts = {
-      dataWidth: overlay.dataWidth || this.cfg.dataWidth,
-      dataHeight: overlay.dataHeight || this.cfg.dataHeight,
-      colors: overlay.colors,
-      colorMap: overlay.colorMap
+      dataWidth: annotation.dataWidth || this.cfg.dataWidth,
+      dataHeight: annotation.dataHeight || this.cfg.dataHeight,
+      colors: annotation.colors,
+      colorMap: annotation.colorMap
     };
 
     this._annotationRenderer = new AnnotationRenderer(
       this.video,
       this.view,
-      overlay.data,
-      overlay.marks,
+      annotation.data,
+      annotation.marks,
       opts
     );
   }

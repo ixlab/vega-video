@@ -151,6 +151,44 @@ function findAndMapVidSignalRefs(spec, namespaces) {
   return result;
 }
 
+function compileAnnotationMarks(spec, playerName, annotation) {
+  if (!annotation?.marks?.length) return;
+
+  const baseData = annotation.data;
+  if (!baseData) return;
+
+  const dataArr = ensureArray(spec, "data");
+
+  for (let i = 0; i < annotation.marks.length; i++) {
+    const mark = annotation.marks[i];
+    const vegaTransforms = mark.transform ? [...mark.transform] : [];
+
+    const encode = mark.encode?.update || mark.encode;
+    if (encode) {
+      for (const channel of Object.keys(encode)) {
+        const ch = encode[channel];
+        if (ch && "signal" in ch) {
+          const fieldName = `_${channel}`;
+          vegaTransforms.push({ type: "formula", as: fieldName, expr: ch.signal });
+          encode[channel] = { field: fieldName };
+        }
+      }
+    }
+
+    if (!vegaTransforms.length) continue;
+
+    const derivedName = `${playerName}_annotation_${i}`;
+    dataArr.push({
+      name: derivedName,
+      source: baseData,
+      transform: vegaTransforms
+    });
+
+    mark.from = { data: derivedName };
+    delete mark.transform;
+  }
+}
+
 function injectPlaylistData(spec, playerName, playlist) {
   if (!playlist.source) return;
 
@@ -208,11 +246,14 @@ export function rewriteSpec(spec, opts = {}) {
   if (cloned.players) {
     const playersArr = Array.isArray(cloned.players) ? cloned.players : Object.values(cloned.players);
     for (const player of playersArr) {
-      if (player.overlay && player.fps == null) {
+      if (player.annotation && player.fps == null) {
         throw new Error(
-          `vega-video: Player "${player.name}" has an overlay but no fps specified. ` +
+          `vega-video: Player "${player.name}" has an annotation but no fps specified. ` +
           `Annotations require fps to calculate frame indices.`
         );
+      }
+      if (player.annotation) {
+        compileAnnotationMarks(cloned, player.name, player.annotation);
       }
       if (player.playlist?.source) {
         injectPlaylistData(cloned, player.name, player.playlist);

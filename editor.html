@@ -1231,8 +1231,64 @@
                 }
             },
             {
+                id: 'simple-annotations',
+                title: 'Simple Object Annotation',
+                sub: 'Vega v6 · bounding boxes + labels',
+                spec: {
+                    "$schema": "https://vega.github.io/schema/vega/v6.json",
+                    "description": "Minimal annotation example: bounding boxes and labels on YOLO detections.",
+                    "width": 1,
+                    "height": 1,
+                    "data": [
+                        {
+                            "name": "detections",
+                            "url": "https://f.dominik.win/vf-sample-media/tos_720p-yolov8l-detections.json",
+                            "transform": [
+                                { "type": "filter", "expr": "datum.frame_index == main_frame_index" }
+                            ]
+                        }
+                    ],
+                    "players": [
+                        {
+                            "name": "main",
+                            "controls": true,
+                            "fps": 24,
+                            "sources": [
+                                { "src": "https://f.dominik.win/vf-sample-media/tos_720p.mp4", "type": "video/mp4" }
+                            ],
+                            "annotation": {
+                                "data": "detections",
+                                "dataWidth": 1280,
+                                "dataHeight": 720,
+                                "marks": [
+                                    {
+                                        "type": "boundingbox",
+                                        "transform": [
+                                            { "type": "filter", "expr": "datum.confidence >= 0.30" }
+                                        ],
+                                        "encode": { "update": {
+                                            "class_id": { "field": "class_id" }
+                                        }}
+                                    },
+                                    {
+                                        "type": "label",
+                                        "transform": [
+                                            { "type": "filter", "expr": "datum.confidence >= 0.30" }
+                                        ],
+                                        "encode": { "update": {
+                                            "class_id": { "field": "class_id" },
+                                            "label": { "signal": "datum.class_name + ' ' + format(datum.confidence, '.2f')" }
+                                        }}
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            },
+            {
                 id: 'yolo-annotations',
-                title: 'YOLO Object Detection Annotations',
+                title: 'Object Annotation Selector',
                 sub: 'Vega v6 · annotation mark types: box, corner, circle, dot, ellipse, label',
                 spec: {
                     "$schema": "https://vega.github.io/schema/vega/v6.json",
@@ -1261,8 +1317,7 @@
                             "name": "detections",
                             "url": "https://f.dominik.win/vf-sample-media/tos_720p-yolov8l-detections.json",
                             "transform": [
-                                { "type": "filter", "expr": "datum.frame_index == main_frame_index" },
-                                { "type": "filter", "expr": "datum.confidence >= minConfidence" }
+                                { "type": "filter", "expr": "datum.frame_index == main_frame_index" }
                             ]
                         }
                     ],
@@ -1274,17 +1329,75 @@
                             "sources": [
                                 { "src": "https://f.dominik.win/vf-sample-media/tos_720p.mp4", "type": "video/mp4" }
                             ],
-                            "overlay": {
+                            "annotation": {
                                 "data": "detections",
                                 "dataWidth": 1280,
                                 "dataHeight": 720,
                                 "marks": [
-                                    { "type": "boundingbox", "showIf": { "signal": "annotationStyle", "value": "boundingbox" } },
-                                    { "type": "corner", "showIf": { "signal": "annotationStyle", "value": "corner" }, "encode": { "update": { "cornerLength": { "value": 15 }, "strokeWidth": { "value": 3 } } } },
-                                    { "type": "circle", "showIf": { "signal": "annotationStyle", "value": "circle" } },
-                                    { "type": "dot", "showIf": { "signal": "annotationStyle", "value": "dot" }, "encode": { "update": { "radius": { "value": 5 } } } },
-                                    { "type": "ellipse", "showIf": { "signal": "annotationStyle", "value": "ellipse" } },
-                                    { "type": "label", "showIf": { "signal": "showLabels" } }
+                                    {
+                                        "type": "boundingbox",
+                                        "transform": [
+                                            { "type": "filter", "expr": "annotationStyle === 'boundingbox'" },
+                                            { "type": "filter", "expr": "datum.confidence >= minConfidence" }
+                                        ],
+                                        "encode": { "update": {
+                                            "class_id": { "field": "class_id" }
+                                        }}
+                                    },
+                                    {
+                                        "type": "corner",
+                                        "transform": [
+                                            { "type": "filter", "expr": "annotationStyle === 'corner'" },
+                                            { "type": "filter", "expr": "datum.confidence >= minConfidence" }
+                                        ],
+                                        "encode": { "update": {
+                                            "class_id": { "field": "class_id" },
+                                            "cornerLength": { "value": 15 },
+                                            "strokeWidth": { "value": 3 }
+                                        }}
+                                    },
+                                    {
+                                        "type": "circle",
+                                        "transform": [
+                                            { "type": "filter", "expr": "annotationStyle === 'circle'" },
+                                            { "type": "filter", "expr": "datum.confidence >= minConfidence" }
+                                        ],
+                                        "encode": { "update": {
+                                            "class_id": { "field": "class_id" }
+                                        }}
+                                    },
+                                    {
+                                        "type": "dot",
+                                        "transform": [
+                                            { "type": "filter", "expr": "annotationStyle === 'dot'" },
+                                            { "type": "filter", "expr": "datum.confidence >= minConfidence" }
+                                        ],
+                                        "encode": { "update": {
+                                            "class_id": { "field": "class_id" },
+                                            "radius": { "value": 5 }
+                                        }}
+                                    },
+                                    {
+                                        "type": "ellipse",
+                                        "transform": [
+                                            { "type": "filter", "expr": "annotationStyle === 'ellipse'" },
+                                            { "type": "filter", "expr": "datum.confidence >= minConfidence" }
+                                        ],
+                                        "encode": { "update": {
+                                            "class_id": { "field": "class_id" }
+                                        }}
+                                    },
+                                    {
+                                        "type": "label",
+                                        "transform": [
+                                            { "type": "filter", "expr": "showLabels" },
+                                            { "type": "filter", "expr": "datum.confidence >= minConfidence" }
+                                        ],
+                                        "encode": { "update": {
+                                            "class_id": { "field": "class_id" },
+                                            "label": { "signal": "datum.class_name + ' ' + format(datum.confidence, '.2f')" }
+                                        }}
+                                    }
                                 ]
                             }
                         }
