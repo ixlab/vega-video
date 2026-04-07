@@ -265,7 +265,6 @@ export class AnnotationRenderer {
   _renderLabels(detections, mark) {
     const encode = mark.encode?.update || mark.encode || {};
     const fontSize = encode.fontSize?.value ?? DEFAULT_FONT_SIZE;
-    const fontFamily = encode.fontFamily?.value ?? "system-ui, sans-serif";
     const textColor = encode.textColor?.value || "#000";
     this._forEachDetection(detections, mark, (d, b, classId) => {
       const x = this._tx(b.x_min);
@@ -285,7 +284,7 @@ export class AnnotationRenderer {
           : className;
       }
 
-      this.ctx.font = `${fontSize}px ${fontFamily}`;
+      this.ctx.font = `${fontSize}px system-ui, sans-serif`;
       this.ctx.textBaseline = "top";
 
       const textW = this.ctx.measureText(labelText).width;
