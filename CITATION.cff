@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+title: "Vega-Video"
+message: "If you find this software helpful in your research, please cite both the software and our paper."
+type: software
+authors:
+  - family-names: Winecki
+    given-names: Dominik
+    orcid: "https://orcid.org/0009-0009-8632-3102"
+  - family-names: Nandi
+    given-names: Arnab
+    orcid: "https://orcid.org/0000-0002-4138-603X"
+abstract: "A Vega plugin for video data: syncing, annotations, and video transformations integrated into the grammar of graphics."
+repository-code: "https://github.com/ixlab/vega-video"
+license: Apache-2.0
+version: 0.1.0
+keywords:
+  - visualization
+  - video
+  - vega
+  - vega-lite
+  - grammar of graphics
+  - computer vision
+  - imageomics
