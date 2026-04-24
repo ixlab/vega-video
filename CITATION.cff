@@ -13,6 +13,7 @@ abstract: "A Vega plugin for video data: syncing, annotations, and video transfo
 repository-code: "https://github.com/ixlab/vega-video"
 license: Apache-2.0
 version: 0.1.0
+date-released: "2026-04-24"
 keywords:
   - visualization
   - video

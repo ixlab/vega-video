@@ -1,0 +1,36 @@
+{
+    "title": "Vega-Video",
+    "version": "0.1.0",
+    "license": "Apache-2.0",
+    "publication_date": "2026-04-24",
+    "creators": [
+        {
+            "name": "Winecki, Dominik",
+            "orcid": "0009-0009-8632-3102",
+            "affiliation": "The Ohio State University"
+        },
+        {
+            "name": "Nandi, Arnab",
+            "orcid": "0000-0002-4138-603X",
+            "affiliation": "The Ohio State University"
+        }
+    ],
+    "description": "A Vega plugin for video data: syncing, annotations, and video transformations integrated into the grammar of graphics.",
+    "keywords": [
+        "visualization",
+        "video",
+        "vega",
+        "vega-lite",
+        "grammar of graphics",
+        "computer vision",
+        "imageomics"
+    ],
+    "grants": [
+        {
+            "id": "021nxhr62::1910356"
+        },
+        {
+            "id": "021nxhr62::2118240"
+        }
+    ]
+}

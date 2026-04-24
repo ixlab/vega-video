@@ -47,3 +47,5 @@ bun test
 Developed by the OSU Interactive Data Systems Lab.
 
 **License:** Apache-2.0
+
+**Acknowledgements:** Supported by the Imageomics Institute (NSF Award #2118240) and NSF Award #1910356.
