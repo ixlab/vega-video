@@ -1,5 +1,7 @@
 # vega-video
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.19737212.svg)](https://doi.org/10.5281/zenodo.19737212)
+
 Vega-Video is a [Vega](https://vega.github.io/vega/) plugin for video data.
 It lets you create portable, expressive, and performant visualizations combining conventional and video data.
 
