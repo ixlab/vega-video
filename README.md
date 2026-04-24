@@ -9,8 +9,8 @@ Vega-Video lets you sync with a video player through signals (e.g., `@player:tim
 
 ## Quick Start
 
-- Try the **[Vega-Video Editor](https://ixlab.github.io/vega-video/editor/)** to experiment with video specs interactively
-- See the **[Vega Editor](https://vega.github.io/editor/)** for the base Vega grammar
+👉 Try the **[Vega-Video Editor](https://ixlab.github.io/vega-video/editor/)** to experiment with video specs interactively. This is the fastest way to quickly play with Vega-video. Compare with the [original version](https://vega.github.io/editor/) for the base Vega grammar.
+
 
 ## Use
 
