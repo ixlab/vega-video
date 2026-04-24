@@ -13,6 +13,7 @@ abstract: "A Vega plugin for video data: syncing, annotations, and video transfo
 repository-code: "https://github.com/ixlab/vega-video"
 license: Apache-2.0
 version: 0.1.0
+doi: 10.5281/zenodo.19737211
 date-released: "2026-04-24"
 keywords:
   - visualization
@@ -22,3 +23,10 @@ keywords:
   - grammar of graphics
   - computer vision
   - imageomics
+identifiers:
+  - description: "The GitHub release URL of tag v0.1.0."
+    type: url
+    value: "https://github.com/ixlab/vega-video/releases/tag/v0.1.0"
+  - description: "The GitHub URL of the commit tagged with v0.1.0."
+    type: url
+    value: "https://github.com/ixlab/vega-video/tree/cb3475c9af9f13c9910c95b04d466f4582abaf16"
