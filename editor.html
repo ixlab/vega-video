@@ -350,14 +350,37 @@
         }
 
         #examplesBtn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
             background: linear-gradient(135deg, #f97316, #ea580c);
             color: white;
-            font-weight: 500;
+            font-weight: 600;
+            font-size: 13px;
             border: none;
+            border-radius: 8px;
+            padding: 7px 14px;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(234, 88, 12, 0.25);
+            transition: all 0.15s ease;
         }
 
         #examplesBtn:hover {
             background: linear-gradient(135deg, #ea580c, #c2410c);
+            box-shadow: 0 4px 10px rgba(234, 88, 12, 0.3), 0 0 0 1px rgba(234, 88, 12, 0.5);
+            transform: translateY(-1px);
+        }
+
+        #examplesBtn svg {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+        }
+
+        .editor-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
     </style>
 </head>
@@ -369,7 +392,18 @@
             <div class="card" aria-label="Spec Editor">
                 <header>
                     <span>Spec (Vega or Vega-Lite)</span>
-                    <span class="hint">⌘/Ctrl+Enter to Run</span>
+                    <div class="editor-header-actions">
+                        <span class="hint">⌘/Ctrl+Enter to Run</span>
+                        <button id="examplesBtn" title="Browse example specs">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="3" y="3" width="7" height="7"></rect>
+                                <rect x="14" y="3" width="7" height="7"></rect>
+                                <rect x="3" y="14" width="7" height="7"></rect>
+                                <rect x="14" y="14" width="7" height="7"></rect>
+                            </svg>
+                            Browse Examples
+                        </button>
+                    </div>
                 </header>
                 <div class="body">
                     <div id="editor" aria-label="JSON editor"></div>
@@ -378,10 +412,6 @@
                     <button id="run" class="primary" title="Run the current spec">Run</button>
                     <label><input type="checkbox" id="autorun" checked /> Auto run</label>
                     <span class="hint" id="status">—</span>
-
-                    <!-- push Examples button to the bottom-right -->
-                    <span style="flex:1"></span>
-                    <button id="examplesBtn" title="Open example specs">Examples</button>
                 </div>
             </div>
 
@@ -2236,7 +2266,9 @@
         });
 
         (async function init() {
-            editor.setValue(JSON.stringify(DEFAULT_SPEC, null, 2), -1);
+            const initialExample = EXAMPLES.find(e => e.id === 'bdd100k-speed-by-scene');
+            const initialSpec = initialExample ? initialExample.spec : DEFAULT_SPEC;
+            editor.setValue(JSON.stringify(initialSpec, null, 2), -1);
             await runFromEditor();
         })();
     </script>
