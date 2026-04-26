@@ -169,16 +169,24 @@
             accent-color: var(--accent);
         }
 
-        /* Right column - visualization and video */
-        .col:last-child .card:first-child {
-            flex: 1;
-            min-height: 0;
+        /* Right column - visualization and video.
+           Right column scrolls as a whole instead of each card scrolling internally. */
+        .col:last-child {
+            overflow-y: auto;
+        }
+
+        .col:last-child .card {
+            flex: none;
+        }
+
+        .col:last-child .card > .body {
+            overflow: visible;
         }
 
         #vis {
             min-height: 200px;
             border-radius: 0 0 12px 12px;
-            overflow: auto;
+            overflow: visible;
             display: flex;
             align-items: flex-start;
             justify-content: center;
@@ -438,7 +446,7 @@
             <div class="card" aria-label="Video">
                 <header><span>Video (@main)</span></header>
                 <div class="body video-wrap">
-                    <video id="video-main" controls playsinline preload="metadata">Your browser needs video
+                    <video id="video-main" controls playsinline preload="metadata" autoplay muted>Your browser needs video
                         support.</video>
                 </div>
             </div>
@@ -1712,7 +1720,7 @@
                 spec: {
                     "$schema": "https://vega.github.io/schema/vega-lite/v6.json",
                     "background": "#faf5ff",
-                    "padding": 20,
+                    "padding": 12,
                     "config": {
                         "font": "Inter, system-ui, sans-serif",
                         "axis": { "labelColor": "#6b7280", "titleColor": "#374151", "gridColor": "#f3e8ff", "domainColor": "#d8b4fe", "tickColor": "#d8b4fe" },
@@ -1721,7 +1729,7 @@
                         "view": { "stroke": "#e9d5ff" },
                         "bar": { "cornerRadiusEnd": 4 }
                     },
-                    "title": { "text": "Speed Distribution by Scene", "color": "#581c87", "fontSize": 18, "fontWeight": 700, "offset": 16 },
+                    "title": { "text": "Speed Distribution by Scene", "color": "#581c87", "fontSize": 15, "fontWeight": 700, "offset": 8 },
                     "players": [
                         {
                             "name": "main",
@@ -1747,8 +1755,8 @@
                     "hconcat": [
                         {
                             "title": "Speed by Road Type",
-                            "width": 300,
-                            "height": 280,
+                            "width": 230,
+                            "height": 200,
                             "layer": [
                                 {
                                     "params": [
@@ -1793,8 +1801,8 @@
                             "vconcat": [
                                 {
                                     "title": "Weather",
-                                    "width": 140,
-                                    "height": 85,
+                                    "width": 110,
+                                    "height": 65,
                                     "layer": [
                                         {
                                             "params": [{ "name": "scene_sel", "select": { "type": "point", "fields": ["weather"] } }],
@@ -1816,8 +1824,8 @@
                                 },
                                 {
                                     "title": "Time of Day",
-                                    "width": 140,
-                                    "height": 70,
+                                    "width": 110,
+                                    "height": 55,
                                     "layer": [
                                         {
                                             "params": [{ "name": "scene_sel", "select": { "type": "point", "fields": ["timeofday"] } }],
@@ -1834,30 +1842,6 @@
                                                 "y": { "field": "timeofday", "type": "nominal", "sort": "-x" },
                                                 "x": { "aggregate": "count" },
                                                 "color": { "field": "timeofday", "type": "nominal", "scale": { "domain": ["daytime", "night", "dawn/dusk"], "range": ["#fbbf24", "#6366f1", "#f472b6"] }, "legend": null }
-                                            }
-                                        }
-                                    ]
-                                },
-                                {
-                                    "title": "Scene Counts",
-                                    "width": 140,
-                                    "height": 95,
-                                    "layer": [
-                                        {
-                                            "params": [{ "name": "scene_sel", "select": { "type": "point", "fields": ["scene"] } }],
-                                            "mark": { "type": "bar", "color": "#f3e8ff", "cornerRadiusEnd": 4 },
-                                            "encoding": {
-                                                "y": { "field": "scene", "type": "nominal", "title": null, "sort": "-x" },
-                                                "x": { "aggregate": "count", "title": null, "axis": { "grid": false } }
-                                            }
-                                        },
-                                        {
-                                            "transform": [{ "filter": { "param": "scene_sel" } }, { "filter": { "param": "speed_sel" } }],
-                                            "mark": { "type": "bar", "cornerRadiusEnd": 4 },
-                                            "encoding": {
-                                                "y": { "field": "scene", "type": "nominal", "sort": "-x" },
-                                                "x": { "aggregate": "count" },
-                                                "color": { "field": "scene", "type": "nominal", "scale": { "domain": ["highway", "city street", "residential", "parking lot", "tunnel"], "range": ["#22c55e", "#a855f7", "#f97316", "#ec4899", "#3b82f6"] }, "legend": null }
                                             }
                                         }
                                     ]
@@ -2266,7 +2250,7 @@
         });
 
         (async function init() {
-            const initialExample = EXAMPLES.find(e => e.id === 'bdd100k-speed-by-scene');
+            const initialExample = EXAMPLES.find(e => e.id === 'bdd100k-brushing-linking');
             const initialSpec = initialExample ? initialExample.spec : DEFAULT_SPEC;
             editor.setValue(JSON.stringify(initialSpec, null, 2), -1);
             await runFromEditor();
