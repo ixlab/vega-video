@@ -128,6 +128,9 @@ export class AnnotationRenderer {
     };
 
     this.video.addEventListener("loadedmetadata", onMeta);
+    this._unsubs.push(() => {
+      this.video.removeEventListener("loadedmetadata", onMeta);
+    });
 
     if (this.video.videoWidth) {
       onMeta();
