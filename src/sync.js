@@ -15,6 +15,9 @@ import { AnnotationRenderer } from "./annotation.js";
 
 const RAPID_SCRUB_IDLE_MS = 120;
 
+// Tracks the Player currently attached to each <video>. Used to clear previous Players if the same video is re-used.
+const VIDEO_PLAYER_REGISTRY = new WeakMap();
+
 export function computeSignalPresence(view, namespaces) {
   const present = {};
   const has = (name) => {
@@ -32,6 +35,13 @@ export function computeSignalPresence(view, namespaces) {
 
 export class Player {
   constructor(view, namespace, video, cfg, signalPresence) {
+    const prev = VIDEO_PLAYER_REGISTRY.get(video);
+    if (prev) {
+      console.warn(`vega-video: replacing existing Player on <video> for namespace "${namespace}"`);
+      prev.destroy();
+    }
+    VIDEO_PLAYER_REGISTRY.set(video, this);
+
     this.view = view;
     this.ns = namespace;
     this.video = video;
@@ -530,6 +540,9 @@ export class Player {
     if (this._annotationRenderer) {
       this._annotationRenderer.destroy();
       this._annotationRenderer = null;
+    }
+    if (VIDEO_PLAYER_REGISTRY.get(this.video) === this) {
+      VIDEO_PLAYER_REGISTRY.delete(this.video);
     }
   }
 }
