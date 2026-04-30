@@ -5,7 +5,7 @@
 Vega-Video is a [Vega](https://vega.github.io/vega/) plugin for video data.
 It lets you create portable, expressive, and performant visualizations combining conventional and video data.
 
-Vega-Video lets you sync with a video player through signals (e.g., `@player:time`), annotate videos with CV detections (e.g., draw bounding boxes), and compose and transform videos (e.g., filter or sort a compilation).
+Vega-Video lets you sync with a video player through signals (e.g., `@player:time`), annotate videos with CV detections (e.g., draw bounding boxes), and compose and transform videos (e.g., filter or sort a compilation). Details can be found in the [preprint](https://arxiv.org/abs/2604.24958) and [demo paper](https://dominik.win/res/vega-video/vega-video-demo.pdf).
 
 ## Quick Start
 
